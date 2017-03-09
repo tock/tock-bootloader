@@ -26,8 +26,8 @@ OUTPUT_ARCH(arm)
 /* Memory Spaces Definitions, 64K flash, 64K ram */
 MEMORY
 {
-  rom (rx)        : ORIGIN = 0x00000000, LENGTH = 0x0000fc00
-  attributes (rx) : ORIGIN = 0x0000fc00, LENGTH = 0x00000400
+  rom (rx)        : ORIGIN = 0x00000000, LENGTH = 0x0000fa00
+  attributes (rx) : ORIGIN = 0x0000fa00, LENGTH = 0x00000600
   ram (rwx)       : ORIGIN = 0x20000000, LENGTH = 0x00010000
 }
 
@@ -130,6 +130,20 @@ SECTIONS
 
     .fill :
     {
+        BYTE(0x54) /* TOCKBOOTLOADER */
+        BYTE(0x4f)
+        BYTE(0x43)
+        BYTE(0x4b)
+        BYTE(0x42)
+        BYTE(0x4f)
+        BYTE(0x4f)
+        BYTE(0x54)
+        BYTE(0x4c)
+        BYTE(0x4f)
+        BYTE(0x41)
+        BYTE(0x44)
+        BYTE(0x45)
+        BYTE(0x52)
         FILL(0xFFFFFFFF);
         . = ORIGIN(attributes) + LENGTH(attributes) - 1;
         BYTE(0xFF)
