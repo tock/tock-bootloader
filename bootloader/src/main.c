@@ -27,18 +27,35 @@
 #include "ASF/common/services/ioport/sam/ioport_gpio.h"
 #include "ASF/common/services/ioport/ioport.h"
 
+#include "bootloader_board.h"
+
+#if TOCK_BOARD_justjump == 1
+// justjump is a null bootloader that simply jumps to the start of the
+// kernel code.
+
+void board_init(void) {
+    // Setup Clock
+    bpm_set_clk32_source(BPM, BPM_CLK32_SOURCE_RC32K);
+    sysclk_init();
+}
+
+extern void jump_into_user_code(void)  __attribute__((noreturn));
+
+int main (void) {
+    board_init();
+    jump_into_user_code();
+}
+
+#else
+// All normal bootloaders use these functions
 
 void board_init(void) {
     // Setup GPIO
     ioport_init();
 
-    // This is probably not used by the bootloader.
-    // But is here in case we ever want to support the CMD_CLKOUT command.
-    ioport_set_pin_dir(PIN_PA10, IOPORT_DIR_OUTPUT);
-
     // Pin which is pulled low to enter bootloader mode.
-    ioport_set_pin_dir(PIN_PA08, IOPORT_DIR_INPUT);
-    ioport_set_pin_mode(PIN_PA08, IOPORT_MODE_PULLUP | IOPORT_MODE_GLITCH_FILTER);
+    ioport_set_pin_dir(BOOTLOADER_SELECT_PIN, IOPORT_DIR_INPUT);
+    ioport_set_pin_mode(BOOTLOADER_SELECT_PIN, IOPORT_MODE_PULLUP | IOPORT_MODE_GLITCH_FILTER);
 
     // Setup Clock
     bpm_set_clk32_source(BPM, BPM_CLK32_SOURCE_RC32K);
@@ -55,7 +72,7 @@ int main (void) {
     uint32_t inactive = 0;
     uint32_t samples = 10000;
     while (samples) {
-        if (ioport_get_pin_level(PIN_PA08) == 0) {
+        if (ioport_get_pin_level(BOOTLOADER_SELECT_PIN) == 0) {
             active++;
         } else {
             inactive++;
@@ -74,3 +91,4 @@ int main (void) {
         jump_into_user_code();
     }
 }
+#endif

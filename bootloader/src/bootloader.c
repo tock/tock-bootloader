@@ -31,6 +31,8 @@
 #include "ASF/common/services/clock/sam4l/sysclk.h"
 #include "ASF/common/services/ioport/ioport.h"
 
+#include "bootloader_board.h"
+
 uint8_t byte_escape;
 uint8_t tx_stage_ram[TXBUFSZ];
 uint16_t tx_ptr;
@@ -61,21 +63,21 @@ void bl_init(void) {
     rx_ptr = 0;
 
     // Enable BL USART
-    ioport_set_pin_mode(PIN_PA12A_USART0_TXD, MUX_PA12A_USART0_TXD);
-    ioport_disable_pin(PIN_PA12A_USART0_TXD);
-    ioport_set_pin_mode(PIN_PA11A_USART0_RXD, MUX_PA11A_USART0_RXD);
-    ioport_disable_pin(PIN_PA11A_USART0_RXD);
-    sysclk_enable_peripheral_clock(USART0);
-    usart_reset(USART0);
-    usart_init_rs232(USART0, &bl_settings, sysclk_get_main_hz());
-    usart_enable_tx(USART0);
-    usart_enable_rx(USART0);
+    ioport_set_pin_mode(BOOTLOADER_UART_TX_PIN, BOOTLOADER_UART_TX_MUX);
+    ioport_disable_pin(BOOTLOADER_UART_TX_PIN);
+    ioport_set_pin_mode(BOOTLOADER_UART_RX_PIN, BOOTLOADER_UART_RX_MUX);
+    ioport_disable_pin(BOOTLOADER_UART_RX_PIN);
+    sysclk_enable_peripheral_clock(BOOTLOADER_UART);
+    usart_reset(BOOTLOADER_UART);
+    usart_init_rs232(BOOTLOADER_UART, &bl_settings, sysclk_get_main_hz());
+    usart_enable_tx(BOOTLOADER_UART);
+    usart_enable_rx(BOOTLOADER_UART);
 }
 
 void bl_loop_poll(void) {
-    if (usart_is_rx_ready(USART0)) {
+    if (usart_is_rx_ready(BOOTLOADER_UART)) {
         uint32_t ch;
-        usart_getchar(USART0, &ch);
+        usart_getchar(BOOTLOADER_UART, &ch);
         if (rx_ptr >= RXBUFSZ) {
             tx_ptr = 0;
             tx_left = 1;
@@ -84,7 +86,7 @@ void bl_loop_poll(void) {
             bl_rxb(ch);
         }
     }
-    if (usart_is_tx_ready(USART0)) {
+    if (usart_is_tx_ready(BOOTLOADER_UART)) {
         if (tx_left > 0) {
             bl_txb(tx_stage_ram[tx_ptr++]);
             tx_left--;
@@ -93,7 +95,7 @@ void bl_loop_poll(void) {
 }
 
 void bl_txb(uint8_t b) {
-    usart_putchar(USART0, b);
+    usart_putchar(BOOTLOADER_UART, b);
 }
 
 void bl_rxb(uint8_t b) {

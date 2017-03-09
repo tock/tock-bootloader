@@ -44,7 +44,15 @@ build/src/bl_commands.o \
 build/src/crc32.o \
 build/src/jumpfunc.o
 
-BINARY_NAME=hail_bootloader
+# Hack so you can do `make imix`, etc.
+TOCK_BOARD=$(firstword $(MAKECMDGOALS))
+ifneq ($(TOCK_BOARD), )
+BOARD = $(TOCK_BOARD)
+CFLAGS += -DTOCK_BOARD=$(TOCK_BOARD)
+CFLAGS += -DTOCK_BOARD_$(TOCK_BOARD)=1
+endif
+
+BINARY_NAME=$(TOCK_BOARD)_bootloader
 
 OUTPUT_FILE_PATH += build/$(BINARY_NAME).bin
 CCBIN=arm-none-eabi-gcc
@@ -78,7 +86,7 @@ CMISCFLAGS+=-fdata-sections --param max-inline-insns-single=500
 
 CPROJFLAGS=-DBOARD=USER_BOARD -Dprintf=iprintf -Dscanf=iscanf -DPARC_CALLBACK_MODE=false
 
-CFLAGS=$(CINCLUDES) $(CWARNS) $(CMISCFLAGS) $(CPROJFLAGS)
+CFLAGS+=$(CINCLUDES) $(CWARNS) $(CMISCFLAGS) $(CPROJFLAGS)
 
 build/src/ASF/common/services/clock/sam4l/%.o: src/ASF/common/services/clock/sam4l/%.c
 	mkdir -p build/src/ASF/common/services/clock/sam4l
@@ -143,18 +151,19 @@ all: $(OUTPUT_FILE_PATH) $(ADDITIONAL_DEPENDENCIES)
 build/src/jumpfunc.o: src/jumpfunc.s
 	$(CCBIN) -c -o "$@" "$<"
 
-build/hail_bootloader.elf: $(OBJS) $(USER_OBJS)
+build/$(BINARY_NAME).elf: $(OBJS) $(USER_OBJS)
 	$(CCBIN) -o$@ $(OBJS) $(LIBS) -mthumb -Wl,-Map="build/$(BINARY_NAME).map" -Wl,--start-group -lm  -Wl,--end-group -L"../src/ASF/thirdparty/CMSIS/Lib/GCC"  -Wl,--gc-sections -mcpu=cortex-m4 -Wl,--entry=Reset_Handler -Wl,--cref -mthumb -T $(LFILE)
 	$(SIZE) $@
 
-build/hail_bootloader.bin: build/hail_bootloader.elf
+build/$(BINARY_NAME).bin: build/$(BINARY_NAME).elf
 	$(OBJCOPY) -Obinary $^ $@
 
 flash-bootloader: $(OUTPUT_FILE_PATH)
 	$(JLINK) $(JLINK_OPTIONS) flash-bootloader.jlink
 
-calib: all
-	$(JLINK) calib.jlink || true
+hail: all
+justjump: all
+
 # Other Targets
 clean:
 	rm -rf build
