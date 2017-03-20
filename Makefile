@@ -19,6 +19,7 @@ src/ASF/sam/utils/cmsis/sam4l/source/templates/gcc/startup_sam4l.c \
 src/ASF/sam/utils/cmsis/sam4l/source/templates/system_sam4l.c \
 src/ASF/sam/utils/syscalls/gcc/syscalls.c \
 src/main.c \
+src/attributes.c \
 src/bootloader.c \
 src/bl_commands.c \
 src/crc32.c
@@ -39,6 +40,7 @@ build/src/ASF/sam/utils/cmsis/sam4l/source/templates/gcc/startup_sam4l.o \
 build/src/ASF/sam/utils/cmsis/sam4l/source/templates/system_sam4l.o \
 build/src/ASF/sam/utils/syscalls/gcc/syscalls.o \
 build/src/main.o \
+build/src/attributes.o \
 build/src/bootloader.o \
 build/src/bl_commands.o \
 build/src/crc32.o \
