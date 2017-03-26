@@ -1,5 +1,4 @@
-Tock Bootloader
-===============
+# ![Tock Bootloader](http://www.tockos.org/assets/img/tockbootloader.svg "Tockbootloader Logo")
 
 The Tock bootloader provides a utility for flashing applications onto
 a board over USB. It is compatible with the
