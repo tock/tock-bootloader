@@ -17,21 +17,46 @@ make [hail|justjump]
 and to flash:
 
 ```bash
-make flash-bootloader
+tockloader flash --address 0 --jtag --arch [board arch] --board [board name] --jtag-device [JLinkExe Device] build/[board]_bootloader.bin
 ```
 
-`justjump`
-----------
+Bootloader Modes
+----------------
 
-In this mode, there is no ability to upload apps or talk to the board. On boot,
-the bootloader just jumps directly to address 0x10000.
+- `justjump`: In this mode, there is no ability to upload apps or talk to the board.
+  On boot, the bootloader just jumps directly to address 0x10000.
+- `hail`: Bootloader with the pins correctly mapped for the hail board.
+
+
+Bootloader Operation
+--------------------
+
+When reset, the board enters the bootloader and checks the status of the
+`BOOTLOADER_SELECT_PIN`. If the pin is high, the bootloader exits by
+moving the location of the vector table to address `0x10000` and then
+jumping to that address. If the pin is low, the board enters bootloader mode
+and waits for commands to be sent over UART. To exit the bootloader mode,
+the chip must be reset with the `BOOTLOADER_SELECT_PIN` pulled high.
+
+The list of valid commands the bootloader accepts is in the
+[Protocol](#over-the-wire-protocol) section. At a high level, the commands
+include reading, writing, and erasing flash, as well as reading and writing
+attributes.
+
+### Attributes
+
+Attributes are key-value pairs that are stored in flash near the beginning
+of the bootloader. Each key may be up to 8 bytes and each value may be up to
+55 bytes. These are useful for adding metadata to the board that can be
+read out by other tools (like Tockloader) later.
 
 
 
-Protocol
---------
+Over the Wire Protocol
+----------------------
 
-All messages are initiated by the client and responded to by the bootloader.
+All messages are sent over UART and are initiated by the client and responded
+to by the bootloader.
 
 ### Framing
 
@@ -295,3 +320,18 @@ Get the CRC of a range of internal flash.
 
 
 
+Future Goals
+------------
+
+The bootloader is stable, but there are future improvements we would like
+to see added:
+
+- Written in Rust. The bootloader should be a special version of the TockOS
+kernel and leverage the memory protection guarantees that Rust can provide.
+- Negotiable baud rate. The bootloader should default to a baud rate of 115200,
+but it should also include a command to change the baud rate to a faster
+rate if both sides support it.
+- Arbitrary code start location. Right now the bootloader assumes that the main
+application code is at address `0x10000`, and that is currently a hardcoded
+value. This should ideally be a special flag that can get updated if we want
+to move the main code (for Tock the kernel) to a different address.
