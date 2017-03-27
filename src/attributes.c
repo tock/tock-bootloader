@@ -14,10 +14,12 @@
 __attribute__ ((section(".attributes")))
 struct {
 	char flag_bootloader_exists[14];
-	uint8_t flags_reserved[498];
+	char flag_version_string[8];
+	uint8_t flags_reserved[490];
 	uint8_t attributes[1024];
 } attributes = {
 	{'T', 'O', 'C', 'K', 'B', 'O', 'O', 'T', 'L', 'O', 'A', 'D', 'E', 'R'},
+	{'0', '.', '5', '.', '0', '\0', '\0', '\0'},
     0x00,
     0x00
 };

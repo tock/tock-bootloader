@@ -24,8 +24,6 @@
 
 #include <flashcalw.h>
 
-#include "info.h"
-
 #include "bootloader.h"
 #include <wdt_sam4l.h>
 #include "ASF/common/services/clock/sam4l/sysclk.h"

@@ -22,7 +22,6 @@
 #include <flashcalw.h>
 #include <ioport.h>
 #include <string.h>
-#include "info.h"
 // COMMAND HELPERS
 // ===============
 
@@ -91,9 +90,12 @@ void bl_c_info()
 {
     char rv [193];
     memset(rv, 0, 193);
-    uint8_t len = snprintf(&rv[1], 191, "StormLoader "BOOTLOADER_VERSION" ("BOOTLOADER_DATE")\n"
-                      "Copyright 2014 Michael Andersen, UC Berkeley\n\n"
-                      "Modified for Hail IoT Module.\n");
+
+    char version_string[8];
+    // Bootloader version string is stored at address 1024+14
+    memcpy(version_string, (uint8_t*) 0x40E, 8);
+
+    uint8_t len = snprintf(&rv[1], 191, "{\"version\":\"%s\", \"name\":\"Tock Bootloader\"}", version_string);
     rv[0] = len;
     _escape_set((uint8_t*)&rv[0], 193, RES_INFO);
 }
