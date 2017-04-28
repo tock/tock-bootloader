@@ -164,6 +164,7 @@ flash-bootloader: $(OUTPUT_FILE_PATH)
 	$(JLINK) $(JLINK_OPTIONS) flash-bootloader.jlink
 
 hail: all
+imix: all
 justjump: all
 
 # Other Targets
