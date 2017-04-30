@@ -38,7 +38,11 @@ uint16_t tx_left;
 uint8_t rx_stage_ram[RXBUFSZ];
 uint16_t rx_ptr;
 
-const sam_usart_opt_t bl_settings = {
+change_baud_state_e change_baud_state = CHANGE_BAUD_IDLE;
+uint32_t new_baud_rate = 0;
+uint32_t old_baud_rate = 0;
+
+sam_usart_opt_t bl_settings = {
      115200,
      US_MR_CHRL_8_BIT,
      US_MR_PAR_NO, //TODO change
@@ -72,6 +76,31 @@ void bl_init(void) {
     usart_enable_rx(BOOTLOADER_UART);
 }
 
+void bl_change_baud_rate(void) {
+    // Save old baud rate in case we need to revert
+    old_baud_rate = bl_settings.baudrate;
+
+    // Set new baud rate
+    bl_settings.baudrate = new_baud_rate;
+    usart_reset(BOOTLOADER_UART);
+    usart_init_rs232(BOOTLOADER_UART, &bl_settings, sysclk_get_main_hz());
+    usart_enable_tx(BOOTLOADER_UART);
+    usart_enable_rx(BOOTLOADER_UART);
+}
+
+uint8_t bl_verify_baud_rate(uint32_t baud_rate) {
+    return baud_rate == bl_settings.baudrate;
+}
+
+void bl_reset_baud_rate(void) {
+    bl_settings.baudrate = old_baud_rate;
+    old_baud_rate = 0;
+    usart_reset(BOOTLOADER_UART);
+    usart_init_rs232(BOOTLOADER_UART, &bl_settings, sysclk_get_main_hz());
+    usart_enable_tx(BOOTLOADER_UART);
+    usart_enable_rx(BOOTLOADER_UART);
+}
+
 void bl_loop_poll(void) {
     if (usart_is_rx_ready(BOOTLOADER_UART)) {
         uint32_t ch;
@@ -88,6 +117,18 @@ void bl_loop_poll(void) {
         if (tx_left > 0) {
             bl_txb(tx_stage_ram[tx_ptr++]);
             tx_left--;
+        } else if (change_baud_state == CHANGE_BAUD_CHANGING) {
+            while (!usart_is_tx_empty(BOOTLOADER_UART));
+            // Change baud rate here so that the response to the initial
+            // change command goes out at the same rate.
+            change_baud_state = CHANGE_BAUD_WAITING_CONFIRMATION;
+            bl_change_baud_rate();
+        } else if (change_baud_state == CHANGE_BAUD_RESETTING) {
+            while (!usart_is_tx_empty(BOOTLOADER_UART));
+            // Change baud rate here so that the failure response goes out
+            // at the same baud rate.
+            change_baud_state = CHANGE_BAUD_IDLE;
+            bl_reset_baud_rate();
         }
     }
 }
@@ -110,6 +151,16 @@ void bl_rxb(uint8_t b) {
     } else if (b == ESCAPE_CHAR) {
         // Need to see the next byte to figure out what to do.
         byte_escape = 1;
+    } else if (change_baud_state == CHANGE_BAUD_WAITING_CONFIRMATION && rx_ptr > 10) {
+        // Something went wrong with changing the baud rate.
+        // First clear the receive, then reset the change baud rate state
+        // machine.
+        while (usart_is_rx_ready(BOOTLOADER_UART)) {
+            uint32_t ch;
+            usart_getchar(BOOTLOADER_UART, &ch);
+        }
+        // Now generate error.
+        bl_cmd(0);
     } else {
         // Save this byte.
         rx_stage_ram[rx_ptr++] = b;
@@ -117,6 +168,23 @@ void bl_rxb(uint8_t b) {
 }
 
 void bl_cmd(uint8_t b) {
+    // Check to see if we are in the middle of changing the baud rate.
+    // If we are, then the only valid command is another baud rate change
+    // command to confirm the new baud rate. If anything else happens, then
+    // something went wrong probably and we should go back to the old
+    // baud rate.
+    if (change_baud_state == CHANGE_BAUD_WAITING_CONFIRMATION &&
+        b != CMD_CHANGE_BAUD) {
+        change_baud_state = CHANGE_BAUD_RESETTING;
+
+        // Set the return here.
+        tx_ptr = 0;
+        tx_left = 2;
+        tx_stage_ram[0] = ESCAPE_CHAR;
+        tx_stage_ram[1] = RES_CHANGE_BAUD_FAIL;
+        return;
+    }
+
     switch(b) {
         case CMD_PING:
             bl_c_ping();
@@ -156,6 +224,9 @@ void bl_cmd(uint8_t b) {
             break;
         case CMD_WUSER:
             bl_c_wuser();
+            break;
+        case CMD_CHANGE_BAUD:
+            bl_change_baud();
             break;
         // These all require external flash and are therefore unsupported.
         case CMD_XEBLOCK:

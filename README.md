@@ -319,6 +319,36 @@ Get the CRC of a range of internal flash.
 
 
 
+#### `CHANGE_BAUD_RATE`
+
+Set a new baud rate for the bootloader.
+
+##### Command
+```
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| SubCmd        | Baud Rate
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                |
++-+-+-+-+-+-+-+-+
+```
+- `Command`: `0x21`.
+- `SubCmd`: The subcommand. `0x01` is used to set the new baud rate.
+  When subcommand `0x01` is sent, the response will be sent at the old
+  baud rate, but the bootloader will switch to the new baud rate after sending
+  the response. To confirm that everything is working, the bootloader expects
+  to see the `CHANGE_BAUD_RATE` command sent again, this time with subcommand
+  `0x02`. Do not send a `RESET` command between the two `CHANGE_BAUD_RATE`
+  commands. Ensure that the same baud rate is sent in both messages.
+- `Baud Rate`: The new baud rate to use. Little endian.
+
+##### Response
+- `Response`: `0x15`.
+- `Message`: `None`.
+
+
+
 
 Future Goals
 ------------
@@ -328,9 +358,6 @@ to see added:
 
 - Written in Rust. The bootloader should be a special version of the TockOS
 kernel and leverage the memory protection guarantees that Rust can provide.
-- Negotiable baud rate. The bootloader should default to a baud rate of 115200,
-but it should also include a command to change the baud rate to a faster
-rate if both sides support it.
 - Arbitrary code start location. Right now the bootloader assumes that the main
 application code is at address `0x10000`, and that is currently a hardcoded
 value. This should ideally be a special flag that can get updated if we want

@@ -430,6 +430,51 @@ void bl_c_wuser(void)
   return;
 }
 
+void bl_change_baud(void) {
+  if (rx_ptr < 5) {
+    _escape_set(NULL, 0, RES_BADARGS);
+    return;
+  }
+
+  // Manage the state machine for updating the baud rate.
+  if (rx_ptr == 5 && rx_stage_ram[0] == CHANGE_BAUD_SUBCMD_NEW) {
+    if (change_baud_state != CHANGE_BAUD_IDLE) {
+      // This is an error. Must not be in the middle of setting a baud rate.
+      _escape_set(NULL, 0, RES_INTERROR);
+      return;
+    }
+    change_baud_state = CHANGE_BAUD_CHANGING;
+    new_baud_rate = _rx_u32(1);
+    _escape_set(NULL, 0, RES_OK);
+
+  } else if (rx_ptr == 10 && rx_stage_ram[5] == CHANGE_BAUD_SUBCMD_CONFIRM) {
+    if (change_baud_state != CHANGE_BAUD_WAITING_CONFIRMATION) {
+      // This is an error. Must be awaiting confirmation.
+      _escape_set(NULL, 0, RES_INTERROR);
+      return;
+    }
+
+    if (bl_verify_baud_rate(_rx_u32(6))) {
+      // Success, new baud rate worked.
+      change_baud_state = CHANGE_BAUD_IDLE;
+      _escape_set(NULL, 0, RES_OK);
+    } else {
+      // Uhh, something went wrong.
+      change_baud_state = CHANGE_BAUD_RESETTING;
+      _escape_set(NULL, 0, RES_CHANGE_BAUD_FAIL);
+    }
+
+  } else if (change_baud_state == CHANGE_BAUD_WAITING_CONFIRMATION) {
+    // We were waiting for confirmation, but didn't get the right
+    // message. Go back to old settings.
+    change_baud_state = CHANGE_BAUD_RESETTING;
+    _escape_set(NULL, 0, RES_CHANGE_BAUD_FAIL);
+
+  } else {
+    _escape_set(NULL, 0, RES_INTERROR);
+  }
+}
+
 void bl_c_unknown()
 {
     _escape_set(NULL, 0, RES_UNKNOWN);

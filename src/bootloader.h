@@ -145,6 +145,16 @@
  */
 #define CMD_WUSER       0x20
 
+/**
+ * Change the baud rate of the bootloader. The first byte is 0x01 to set
+ * a new baud rate. The next 4 bytes are the new baud rate. To allow the
+ * bootloader to verify that the new baud rate works, the host must call
+ * this command again with the first byte of 0x02 and the next 4 bytes
+ * of the new baud rate. If the next command does not match this, the
+ * bootloader will revert to the old baud rate.
+ */
+#define CMD_CHANGE_BAUD 0x21
+
 #define RES_OVERFLOW    0x10
 #define RES_PONG        0x11
 #define RES_BADADDR     0x12
@@ -161,6 +171,7 @@
 #define RES_CRCIF       0x23
 #define RES_CRCXF       0x24
 #define RES_INFO        0x25
+#define RES_CHANGE_BAUD_FAIL 0x26
 
 #define ALLOWED_ATTRIBUTE_FLOOR   0x600
 #define ALLOWED_ATTRIBUTE_CEILING 0xA00
@@ -184,11 +195,27 @@ extern uint16_t tx_left;
 extern uint8_t rx_stage_ram [RXBUFSZ];
 extern uint16_t rx_ptr;
 
+/* Change baud rate states
+ */
+typedef enum {
+  CHANGE_BAUD_IDLE,
+  CHANGE_BAUD_CHANGING,
+  CHANGE_BAUD_WAITING_CONFIRMATION,
+  CHANGE_BAUD_RESETTING,
+} change_baud_state_e;
+
+#define CHANGE_BAUD_SUBCMD_NEW     0x01
+#define CHANGE_BAUD_SUBCMD_CONFIRM 0x02
+
+extern change_baud_state_e change_baud_state;
+extern uint32_t new_baud_rate;
+
 void bl_init(void);
 void bl_testloop(void);
 void bl_txb_r(uint8_t b);
 void bl_txb(uint8_t b);
 void bl_rxb(uint8_t b);
+uint8_t bl_verify_baud_rate(uint32_t baud_rate);
 
 void bl_c_ping(void);
 void bl_c_info(void);
@@ -206,6 +233,7 @@ void bl_c_crcif(void);
 void bl_c_unknown(void);
 void bl_c_clkout(void);
 void bl_c_wuser(void);
+void bl_change_baud(void);
 
 uint32_t crc32(uint32_t crc, const void *buf, uint32_t size);
 
