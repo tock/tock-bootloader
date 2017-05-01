@@ -26,6 +26,7 @@ Bootloader Modes
 - `justjump`: In this mode, there is no ability to upload apps or talk to the board.
   On boot, the bootloader just jumps directly to address 0x10000.
 - `hail`: Bootloader with the pins correctly mapped for the hail board.
+- `imix`: Bootloader with the pins correctly mapped for the imix board.
 
 
 Bootloader Operation
