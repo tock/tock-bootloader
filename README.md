@@ -11,7 +11,7 @@ Compiling
 ---------
 
 ```bash
-make [hail|justjump]
+make [hail|imix|justjump]
 ```
 
 and to flash:
