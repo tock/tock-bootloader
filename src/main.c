@@ -81,7 +81,7 @@ int main (void) {
     }
 
     if (active > inactive) {
-        // Enter bootloader mode and wait for commands from sload
+        // Enter bootloader mode and wait for commands from tockloader
         bl_init();
         while (1) {
             bl_loop_poll();
