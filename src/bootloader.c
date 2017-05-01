@@ -43,11 +43,11 @@ uint32_t new_baud_rate = 0;
 uint32_t old_baud_rate = 0;
 
 sam_usart_opt_t bl_settings = {
-     115200,
-     US_MR_CHRL_8_BIT,
-     US_MR_PAR_NO, //TODO change
-     US_MR_NBSTOP_1_BIT,
-     US_MR_CHMODE_NORMAL
+    115200,
+    US_MR_CHRL_8_BIT,
+    US_MR_PAR_NO, //TODO change
+    US_MR_NBSTOP_1_BIT,
+    US_MR_CHMODE_NORMAL
 };
 
 void bl_init(void) {
@@ -219,9 +219,6 @@ void bl_cmd(uint8_t b) {
         case CMD_CRCIF:
             bl_c_crcif();
             break;
-        case CMD_CLKOUT:
-            bl_c_clkout();
-            break;
         case CMD_WUSER:
             bl_c_wuser();
             break;
@@ -235,6 +232,8 @@ void bl_cmd(uint8_t b) {
         case CMD_CRCEF:
         case CMD_XEPAGE:
         case CMD_XFINIT:
+        // This we just don't need anymore.
+        case CMD_CLKOUT:
         default:
             bl_c_unknown();
             break;

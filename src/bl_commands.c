@@ -104,22 +104,6 @@ void bl_c_reset(void) {
     tx_left = 0;
 }
 
-void bl_c_clkout(void) {
-    //pa19 as gclk0 (peripheral E)
-    //DFLL/48
-    //*((volatile uint32_t*)(0x400E0800 + 0x074)) = 0x00170203; //GCLK0=dfll/48
-    //RCSYS NO DIV
-    //*((volatile uint32_t*)(0x400E0800 + 0x074)) = 0x00170001;
-    //RC32
-    *((volatile uint32_t*)(0x400E0800 + 0x074)) = 0x00170d01;
-    *((volatile uint32_t*)(0x400E1000 + 0x008)) = (1<<19); //disable GPIO
-    *((volatile uint32_t*)(0x400E1000 + 0x168)) = (1<<19); //disable ST
-    *((volatile uint32_t*)(0x400E1000 + 0x018)) = (1<<19); //pmr0c
-    *((volatile uint32_t*)(0x400E1000 + 0x028)) = (1<<19); //pmr1c
-    *((volatile uint32_t*)(0x400E1000 + 0x034)) = (1<<19); //pmr2s
-    while(1);
-}
-
 void bl_c_epage(void) {
     if (rx_ptr != (4)) {
         _escape_set(NULL, 0, RES_BADARGS);
