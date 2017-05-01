@@ -29,20 +29,13 @@
 
 #include "bootloader_board.h"
 
+extern void jump_into_user_code(void)  __attribute__((noreturn));
+
 #if TOCK_BOARD_justjump == 1
 // justjump is a null bootloader that simply jumps to the start of the
 // kernel code.
 
-void board_init(void) {
-    // Setup Clock
-    bpm_set_clk32_source(BPM, BPM_CLK32_SOURCE_RC32K);
-    sysclk_init();
-}
-
-extern void jump_into_user_code(void)  __attribute__((noreturn));
-
 int main (void) {
-    board_init();
     jump_into_user_code();
 }
 
@@ -61,8 +54,6 @@ void board_init(void) {
     bpm_set_clk32_source(BPM, BPM_CLK32_SOURCE_RC32K);
     sysclk_init();
 }
-
-extern void jump_into_user_code(void)  __attribute__((noreturn));
 
 int main (void) {
     board_init();
