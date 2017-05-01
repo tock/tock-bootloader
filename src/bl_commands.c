@@ -22,6 +22,7 @@
 #include <flashcalw.h>
 #include <ioport.h>
 #include <string.h>
+
 // COMMAND HELPERS
 // ===============
 
@@ -30,31 +31,27 @@ inline void _escape_set(uint8_t *dat, uint16_t len, uint8_t cmd);
 inline uint32_t _rx_u32(uint16_t offset);
 inline uint16_t _rx_u16(uint16_t offset);
 
-inline void _escape_cat(uint8_t *dat, uint16_t len)
-{
-    while(len-- && (tx_left < (TXBUFSZ-1)))
-    {
-        if (*dat == ESCAPE_CHAR)
+inline void _escape_cat(uint8_t *dat, uint16_t len) {
+    while(len-- && (tx_left < (TXBUFSZ-1))) {
+        if (*dat == ESCAPE_CHAR) {
             tx_stage_ram[tx_left++] = ESCAPE_CHAR;
+        }
         tx_stage_ram[tx_left++] = *dat;
-        dat ++;
+        dat++;
     }
 }
 
-inline void _escape_set(uint8_t *dat, uint16_t len, uint8_t cmd)
-{
+inline void _escape_set(uint8_t *dat, uint16_t len, uint8_t cmd) {
     tx_ptr = 0;
     tx_left = 2;
     tx_stage_ram[0] = ESCAPE_CHAR;
     tx_stage_ram[1] = cmd;
-    if (len > 0)
-    {
+    if (len > 0) {
         _escape_cat(dat, len);
     }
 }
 
-inline uint32_t _rx_u32(uint16_t offset)
-{
+inline uint32_t _rx_u32(uint16_t offset) {
     uint32_t rv = ((uint32_t)rx_stage_ram[offset++]);
     rv |= ((uint32_t)rx_stage_ram[offset++] << 8);
     rv |= ((uint32_t)rx_stage_ram[offset++] << 16);
@@ -62,8 +59,7 @@ inline uint32_t _rx_u32(uint16_t offset)
     return rv;
 }
 
-inline uint32_t _buf_u32(uint8_t* buf, uint16_t offset)
-{
+inline uint32_t _buf_u32(uint8_t* buf, uint16_t offset) {
     uint32_t rv = ((uint32_t)buf[offset++]);
     rv |= ((uint32_t)buf[offset++] << 8);
     rv |= ((uint32_t)buf[offset++] << 16);
@@ -71,8 +67,7 @@ inline uint32_t _buf_u32(uint8_t* buf, uint16_t offset)
     return rv;
 }
 
-inline uint16_t _rx_u16(uint16_t offset)
-{
+inline uint16_t _rx_u16(uint16_t offset) {
     uint16_t rv = ((uint16_t)rx_stage_ram[offset++]);
     rv |= ((uint16_t)rx_stage_ram[offset++] << 8);
     return rv;
@@ -81,13 +76,11 @@ inline uint16_t _rx_u16(uint16_t offset)
 // COMMANDS
 // ========
 
-void bl_c_ping()
-{
+void bl_c_ping(void) {
     _escape_set(NULL, 0, RES_PONG);
 }
 
-void bl_c_info()
-{
+void bl_c_info(void) {
     char rv [193];
     memset(rv, 0, 193);
 
@@ -100,21 +93,18 @@ void bl_c_info()
     _escape_set((uint8_t*)&rv[0], 193, RES_INFO);
 }
 
-void bl_c_id()
-{
+void bl_c_id(void) {
     //Read the program info and stuff
     //Test holder for now
 }
 
-void bl_c_reset()
-{
+void bl_c_reset(void) {
     tx_left = 0;
     rx_ptr = 0;
     tx_left = 0;
 }
 
-void bl_c_clkout()
-{
+void bl_c_clkout(void) {
     //pa19 as gclk0 (peripheral E)
     //DFLL/48
     //*((volatile uint32_t*)(0x400E0800 + 0x074)) = 0x00170203; //GCLK0=dfll/48
@@ -130,10 +120,8 @@ void bl_c_clkout()
     while(1);
 }
 
-void bl_c_epage()
-{
-    if (rx_ptr != (4))
-    {
+void bl_c_epage(void) {
+    if (rx_ptr != (4)) {
         _escape_set(NULL, 0, RES_BADARGS);
         return;
     }
@@ -143,37 +131,32 @@ void bl_c_epage()
     bool brv;
 
     if (addr < ALLOWED_FLASH_FLOOR || addr >= ALLOWED_FLASH_CEILING ||
-            (addr & 511) != 0)
-    {
+        (addr & 511) != 0) {
         _escape_set(NULL, 0, RES_BADADDR);
         return;
     }
     flashcalw_default_wait_until_ready();
 
     brv = flashcalw_quick_page_read(pagenum);
-    if (brv)
-    {   //This means the page is already erased
+    if (brv) {
+        //This means the page is already erased
         _escape_set(NULL, 0, RES_OK);
         return;
     }
     flashcalw_default_wait_until_ready();
     brv = flashcalw_erase_page(pagenum, true);
     flashcalw_picocache_invalid_all();
-    if (!brv)
-    {
+    if (!brv) {
         _escape_set(NULL, 0, RES_INTERROR);
         return;
     }
     flashcalw_default_wait_until_ready();
 
     _escape_set(NULL, 0, RES_OK);
-    return;
 }
 
-void bl_c_wpage()
-{
-    if (rx_ptr != (512+4))
-    {
+void bl_c_wpage(void) {
+    if (rx_ptr != (512+4)) {
         _escape_set(NULL, 0, RES_BADARGS);
         return;
     }
@@ -183,8 +166,7 @@ void bl_c_wpage()
     bool brv;
 
     if (addr < ALLOWED_FLASH_FLOOR || addr >= ALLOWED_FLASH_CEILING ||
-            (addr & 511) != 0)
-    {
+        (addr & 511) != 0) {
         _escape_set(NULL, 0, RES_BADADDR);
         return;
     }
@@ -192,8 +174,7 @@ void bl_c_wpage()
 
     brv = flashcalw_erase_page(pagenum, true);
     flashcalw_picocache_invalid_all();
-    if (!brv)
-    {
+    if (!brv) {
         _escape_set(NULL, 0, RES_INTERROR);
         return;
     }
@@ -205,8 +186,7 @@ void bl_c_wpage()
 
     uint32_t *fp = (uint32_t*) addr;
     uint16_t i;
-    for (i=4; i < 516; i+=8)
-    {
+    for (i=4; i < 516; i+=8) {
         *fp = 0xFFFFFFFF;
         *(fp+1) = 0xFFFFFFFF;
         *fp = _rx_u32(i);
@@ -221,55 +201,44 @@ void bl_c_wpage()
     flashcalw_default_wait_until_ready();
 
     _escape_set(NULL, 0, RES_OK);
-    return;
-
 }
 
-void bl_c_crcrx(void)
-{
+void bl_c_crcrx(void) {
     uint8_t rv [6];
     rv[0] = (uint8_t) rx_ptr & 0xFF;
     rv[1] = (uint8_t) (rx_ptr >> 8);
-    if (rx_ptr == 0)
-    {
+    if (rx_ptr == 0) {
         rv[2] = rv[3] = rv[4] = rv[5] = 0xFF;
-    }
-    else
-    {
+    } else {
         uint32_t crc = crc32(0, &rx_stage_ram[0],rx_ptr);
-        rv[2] = (uint8_t) (crc & 0xFF); crc >>=8;
-        rv[3] = (uint8_t) (crc & 0xFF); crc >>=8;
-        rv[4] = (uint8_t) (crc & 0xFF); crc >>=8;
+        rv[2] = (uint8_t) (crc & 0xFF); crc >>= 8;
+        rv[3] = (uint8_t) (crc & 0xFF); crc >>= 8;
+        rv[4] = (uint8_t) (crc & 0xFF); crc >>= 8;
         rv[5] = (uint8_t) (crc & 0xFF);
     }
     _escape_set(rv, 6, RES_CRCRX);
 }
 
-void bl_c_rrange(void)
-{
-    if (rx_ptr != 6)
-    {
+void bl_c_rrange(void) {
+    if (rx_ptr != 6) {
         _escape_set(NULL, 0, RES_BADARGS);
         return;
     }
     uint16_t len = _rx_u16(4);
 
     //We only go to half the buffer because of escape expanding
-    if (rx_ptr != 6 || len >= (TXBUFSZ>>1))
-    {
+    if (rx_ptr != 6 || len >= (TXBUFSZ>>1)) {
         _escape_set(NULL, 0, RES_BADARGS);
         return;
     }
     uint32_t addr = _rx_u32(0);
-    if ((addr+len) > ALLOWED_FLASH_CEILING+1)
-    {
+    if ((addr+len) > ALLOWED_FLASH_CEILING+1) {
         _escape_set(NULL, 0, RES_BADADDR);
         return;
     }
     flashcalw_picocache_invalid_all();
     uint8_t* p = (uint8_t*) addr;
     _escape_set(p, len, RES_RRANGE);
-    return;
 }
 
 void bl_c_sattr(void) {
@@ -341,7 +310,6 @@ void bl_c_sattr(void) {
     flashcalw_default_wait_until_ready();
 
     _escape_set(NULL, 0, RES_OK);
-    return;
 }
 
 void bl_c_gattr(void) {
@@ -360,21 +328,17 @@ void bl_c_gattr(void) {
     flashcalw_picocache_invalid_all();
     uint8_t* p = (uint8_t*) addr;
     _escape_set(p, 64, RES_GATTR);
-    return;
 }
 
-void bl_c_crcif(void)
-{
-    if (rx_ptr != 8)
-    {
+void bl_c_crcif(void) {
+    if (rx_ptr != 8) {
         _escape_set(NULL, 0, RES_BADARGS);
         return;
     }
     uint32_t base = _rx_u32(0);
     uint32_t len = _rx_u32(4);
-    if(base >= ALLOWED_FLASH_CEILING || (base+len) > ALLOWED_FLASH_CEILING+1
-            || (len >= 512*1024))
-    {
+    if (base >= ALLOWED_FLASH_CEILING || (base+len) > ALLOWED_FLASH_CEILING+1
+        || (len >= 512*1024)) {
         _escape_set(NULL, 0, RES_BADADDR);
         return;
     }
@@ -382,101 +346,91 @@ void bl_c_crcif(void)
     uint8_t* p = (uint8_t*) base;
     uint32_t crc = crc32(0, p, len);
     uint8_t rv [4];
-    rv[0] = (uint8_t) (crc & 0xFF); crc >>=8;
-    rv[1] = (uint8_t) (crc & 0xFF); crc >>=8;
-    rv[2] = (uint8_t) (crc & 0xFF); crc >>=8;
+    rv[0] = (uint8_t) (crc & 0xFF); crc >>= 8;
+    rv[1] = (uint8_t) (crc & 0xFF); crc >>= 8;
+    rv[2] = (uint8_t) (crc & 0xFF); crc >>= 8;
     rv[3] = (uint8_t) (crc & 0xFF);
 
     _escape_set(rv, 4, RES_CRCIF);
 }
 
-void bl_c_wuser(void)
-{
-  if (rx_ptr != 8)
-  {
-      _escape_set(NULL, 0, RES_BADARGS);
-      return;
-  }
-  bool brv;
+void bl_c_wuser(void) {
+    if (rx_ptr != 8) {
+        _escape_set(NULL, 0, RES_BADARGS);
+        return;
+    }
+    bool brv;
 
-  flashcalw_default_wait_until_ready();
+    flashcalw_default_wait_until_ready();
+    brv = flashcalw_erase_user_page(true);
+    flashcalw_picocache_invalid_all();
+    if (!brv) {
+        _escape_set(NULL, 0, RES_INTERROR);
+        return;
+    }
+    flashcalw_default_wait_until_ready();
+    flashcalw_clear_page_buffer();
+    flashcalw_default_wait_until_ready();
 
-  brv = flashcalw_erase_user_page(true);
+    *((volatile uint32_t*)(0x00800004)) = 0xFFFFFFFF;
+    *((volatile uint32_t*)(0x00800000)) = 0xFFFFFFFF;
+    *((volatile uint32_t*)(0x00800004)) = _rx_u32(0);
+    *((volatile uint32_t*)(0x00800000)) = _rx_u32(4);
 
-  flashcalw_picocache_invalid_all();
-  if (!brv)
-  {
-      _escape_set(NULL, 0, RES_INTERROR);
-      return;
-  }
-  flashcalw_default_wait_until_ready();
+    flashcalw_default_wait_until_ready();
 
-  flashcalw_clear_page_buffer();
+    flashcalw_write_user_page();
+    flashcalw_picocache_invalid_all();
+    flashcalw_default_wait_until_ready();
 
-  flashcalw_default_wait_until_ready();
-
-  *((volatile uint32_t*)(0x00800004)) = 0xFFFFFFFF;
-  *((volatile uint32_t*)(0x00800000)) = 0xFFFFFFFF;
-  *((volatile uint32_t*)(0x00800004)) = _rx_u32(0);
-  *((volatile uint32_t*)(0x00800000)) = _rx_u32(4);
-
-  flashcalw_default_wait_until_ready();
-
-  flashcalw_write_user_page();
-  flashcalw_picocache_invalid_all();
-  flashcalw_default_wait_until_ready();
-
-  _escape_set(NULL, 0, RES_OK);
-  return;
+    _escape_set(NULL, 0, RES_OK);
 }
 
 void bl_change_baud(void) {
-  if (rx_ptr < 5) {
-    _escape_set(NULL, 0, RES_BADARGS);
-    return;
-  }
-
-  // Manage the state machine for updating the baud rate.
-  if (rx_ptr == 5 && rx_stage_ram[0] == CHANGE_BAUD_SUBCMD_NEW) {
-    if (change_baud_state != CHANGE_BAUD_IDLE) {
-      // This is an error. Must not be in the middle of setting a baud rate.
-      _escape_set(NULL, 0, RES_INTERROR);
-      return;
-    }
-    change_baud_state = CHANGE_BAUD_CHANGING;
-    new_baud_rate = _rx_u32(1);
-    _escape_set(NULL, 0, RES_OK);
-
-  } else if (rx_ptr == 10 && rx_stage_ram[5] == CHANGE_BAUD_SUBCMD_CONFIRM) {
-    if (change_baud_state != CHANGE_BAUD_WAITING_CONFIRMATION) {
-      // This is an error. Must be awaiting confirmation.
-      _escape_set(NULL, 0, RES_INTERROR);
-      return;
+    if (rx_ptr < 5) {
+        _escape_set(NULL, 0, RES_BADARGS);
+        return;
     }
 
-    if (bl_verify_baud_rate(_rx_u32(6))) {
-      // Success, new baud rate worked.
-      change_baud_state = CHANGE_BAUD_IDLE;
-      _escape_set(NULL, 0, RES_OK);
+    // Manage the state machine for updating the baud rate.
+    if (rx_ptr == 5 && rx_stage_ram[0] == CHANGE_BAUD_SUBCMD_NEW) {
+        if (change_baud_state != CHANGE_BAUD_IDLE) {
+            // This is an error. Must not be in the middle of setting a baud rate.
+            _escape_set(NULL, 0, RES_INTERROR);
+            return;
+        }
+        change_baud_state = CHANGE_BAUD_CHANGING;
+        new_baud_rate = _rx_u32(1);
+        _escape_set(NULL, 0, RES_OK);
+
+    } else if (rx_ptr == 10 && rx_stage_ram[5] == CHANGE_BAUD_SUBCMD_CONFIRM) {
+        if (change_baud_state != CHANGE_BAUD_WAITING_CONFIRMATION) {
+            // This is an error. Must be awaiting confirmation.
+            _escape_set(NULL, 0, RES_INTERROR);
+            return;
+        }
+
+        if (bl_verify_baud_rate(_rx_u32(6))) {
+            // Success, new baud rate worked.
+            change_baud_state = CHANGE_BAUD_IDLE;
+            _escape_set(NULL, 0, RES_OK);
+        } else {
+            // Uhh, something went wrong.
+            change_baud_state = CHANGE_BAUD_RESETTING;
+            _escape_set(NULL, 0, RES_CHANGE_BAUD_FAIL);
+        }
+
+    } else if (change_baud_state == CHANGE_BAUD_WAITING_CONFIRMATION) {
+        // We were waiting for confirmation, but didn't get the right
+        // message. Go back to old settings.
+        change_baud_state = CHANGE_BAUD_RESETTING;
+        _escape_set(NULL, 0, RES_CHANGE_BAUD_FAIL);
+
     } else {
-      // Uhh, something went wrong.
-      change_baud_state = CHANGE_BAUD_RESETTING;
-      _escape_set(NULL, 0, RES_CHANGE_BAUD_FAIL);
+        _escape_set(NULL, 0, RES_INTERROR);
     }
-
-  } else if (change_baud_state == CHANGE_BAUD_WAITING_CONFIRMATION) {
-    // We were waiting for confirmation, but didn't get the right
-    // message. Go back to old settings.
-    change_baud_state = CHANGE_BAUD_RESETTING;
-    _escape_set(NULL, 0, RES_CHANGE_BAUD_FAIL);
-
-  } else {
-    _escape_set(NULL, 0, RES_INTERROR);
-  }
 }
 
-void bl_c_unknown()
-{
+void bl_c_unknown() {
     _escape_set(NULL, 0, RES_UNKNOWN);
-    return;
 }
