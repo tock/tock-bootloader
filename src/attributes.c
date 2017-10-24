@@ -15,25 +15,25 @@
 
 __attribute__ ((section(".attributes")))
 struct {
-	char    flag_bootloader_exists[14];
-	char    flag_version_string[8];
-	uint8_t flags_reserved[490];
-	char    attribute00[ATTRIBUTES_00_LEN];
-	uint8_t attribute00_padding[64-ATTRIBUTES_00_LEN];
-	char    attribute01[ATTRIBUTES_01_LEN];
-	uint8_t attribute01_padding[64-ATTRIBUTES_01_LEN];
-	char    attribute02[ATTRIBUTES_02_LEN];
-	uint8_t attribute02_padding[64-ATTRIBUTES_02_LEN];
-	uint8_t attributes[832];
+    char    flag_bootloader_exists[14];
+    char    flag_version_string[8];
+    uint8_t flags_reserved[490];
+    char    attribute00[ATTRIBUTES_00_LEN];
+    uint8_t attribute00_padding[64-ATTRIBUTES_00_LEN];
+    char    attribute01[ATTRIBUTES_01_LEN];
+    uint8_t attribute01_padding[64-ATTRIBUTES_01_LEN];
+    char    attribute02[ATTRIBUTES_02_LEN];
+    uint8_t attribute02_padding[64-ATTRIBUTES_02_LEN];
+    uint8_t attributes[832];
 } attributes = {
-	{'T', 'O', 'C', 'K', 'B', 'O', 'O', 'T', 'L', 'O', 'A', 'D', 'E', 'R'},
-	{'0', '.', '6', '.', '0', '\0', '\0', '\0'},
-    {0x00},
-    ATTRIBUTES_00_DEF,
-    {0x00},
-    ATTRIBUTES_01_DEF,
-    {0x00},
-    ATTRIBUTES_02_DEF,
-    {0x00},
-    {0x00}
+    .flag_bootloader_exists = {'T', 'O', 'C', 'K', 'B', 'O', 'O', 'T', 'L', 'O', 'A', 'D', 'E', 'R'},
+    .flag_version_string    = {'0', '.', '6', '.', '0', '\0', '\0', '\0'},
+    .flags_reserved         = {0x00},
+    .attribute00            = ATTRIBUTES_00_DEF,
+    .attribute00_padding    = {0x00},
+    .attribute01            = ATTRIBUTES_01_DEF,
+    .attribute01_padding    = {0x00},
+    .attribute02            = ATTRIBUTES_02_DEF,
+    .attribute02_padding    = {0x00},
+    .attributes             = {0x00}
 };
