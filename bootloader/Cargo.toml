@@ -1,0 +1,8 @@
+[package]
+name = "bootloader"
+version = "0.1.0"
+authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
+
+[dependencies]
+kernel = { git = "https://github.com/tock/tock" }
+tockloader-proto = "0.2.1"
