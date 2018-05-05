@@ -1,6 +1,6 @@
 /*
  * This is the generic linker script for Tock. For most developers, it should
- * be sufficient to define {ROM/PROG/RAM}_{ORIGIN/LENGTH} (6 variables, the
+ * be sufficient to define {ROM/RAM}_{ORIGIN/LENGTH} (6 variables, the
  * start and length for each) and MPU_MIN_ALIGN (the minimum alignment
  * granularity supported by the MPU).
  *
@@ -36,7 +36,6 @@ CCFG_LENGTH = DEFINED(CCFG_LENGTH) ? CCFG_LENGTH : 0;
 MEMORY
 {
   rom (rx)  : ORIGIN =  ROM_ORIGIN, LENGTH =  ROM_LENGTH
-  prog (rx) : ORIGIN = PROG_ORIGIN, LENGTH = PROG_LENGTH
   ccfg (rx) : ORIGIN = CCFG_ORIGIN, LENGTH = CCFG_LENGTH
   ram (rwx) : ORIGIN =  RAM_ORIGIN, LENGTH =  RAM_LENGTH
 }
