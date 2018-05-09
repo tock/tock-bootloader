@@ -5,6 +5,7 @@ PLATFORM=hailbootloader
 
 include ../Makefile.common
 
+TOCKLOADER = tockloader
 TOCKLOADER_JTAG_FLAGS = --jtag --board hail --arch cortex-m4 --jtag-device ATSAM4LC8C
 
 # upload kernel over JTAG
