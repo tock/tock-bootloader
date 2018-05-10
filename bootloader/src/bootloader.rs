@@ -12,6 +12,10 @@ extern crate tockloader_proto;
 // Main buffer that commands are received into and sent from.
 pub static mut BUF: [u8; 600] = [0; 600];
 
+// How long to wait, in bit periods, after receiving a byte for the next
+// byte before timing out and calling `receive_complete`.
+const UART_RECEIVE_TIMEOUT: u8 = 100;
+
 // Bootloader constants
 const ESCAPE_CHAR: u8 = 0xFC;
 
@@ -110,7 +114,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
         if active > inactive {
             // Looks like we do want bootloader mode.
             self.buffer.take().map(|buffer| {
-                self.uart.receive_automatic(buffer, 250);
+                self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
             });
         } else {
             // Jump to the kernel and start the real code.
@@ -162,7 +166,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                     // We are either done, or need to setup the next read.
                     if remaining_length == 0 {
                         self.state.set(State::Idle);
-                        self.uart.receive_automatic(buffer, 250);
+                        self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
                     } else {
                         self.buffer.replace(buffer);
                         self.page_buffer.take().map(move |page| {
@@ -173,7 +177,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                 }
 
                 _ => {
-                    self.uart.receive_automatic(buffer, 250);
+                    self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
                 }
             }
         }
@@ -217,7 +221,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                     // If there are more bytes in the buffer we want to continue
                     // parsing those. Otherwise, we want to go back to receive.
                     if i == rx_len - 1 {
-                        self.uart.receive_automatic(buffer, 250);
+                        self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
                         break;
                     }
                 }
@@ -559,7 +563,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
 
             _ => {
                 self.buffer.take().map(|buffer| {
-                    self.uart.receive_automatic(buffer, 250);
+                    self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
                 });
             }
         }
@@ -579,7 +583,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
 
             _ => {
                 self.buffer.take().map(|buffer| {
-                    self.uart.receive_automatic(buffer, 250);
+                    self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
                 });
             }
         }
