@@ -356,8 +356,13 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_INFO;
-
-                    // "{\"version\":\"%s\", \"name\":\"Tock Bootloader\"}"
+                    let mut index = 3;
+                    // let k = "{\"version\":\"%s\", \"name\":\"Tock Bootloader\"}";
+                    let str01 = "{\"version\":\"";
+                    for i in 0..str01.len() {
+                        buffer[index] = str01.as_bytes()[i];
+                        index += 1;
+                    }
 
                     // Version string is at most 8 bytes long, and starts
                     // at index 14 in the bootloader page.
@@ -366,9 +371,22 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                         if b == 0 {
                             break;
                         }
-                        buffer[i + 2] = b;
+                        buffer[index] = b;
+                        index += 1;
                     }
-                    for i in 10..195 {
+
+                    let str02 = "\", \"name\":\"Tock Bootloader\"}";
+                    for i in 0..str02.len() {
+                        buffer[index] = str02.as_bytes()[i];
+                        index += 1;
+                    }
+
+                    // Need to insert the string length as the first byte
+                    // after the header.
+                    buffer[2] = index as u8 - 3;
+                    index += 1;
+
+                    for i in index..195 {
                         buffer[i] = 0;
                     }
 
