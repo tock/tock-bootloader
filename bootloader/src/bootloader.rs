@@ -357,7 +357,8 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_INFO;
                     let mut index = 3;
-                    // let k = "{\"version\":\"%s\", \"name\":\"Tock Bootloader\"}";
+
+                    // Insert the first part of the JSON blob into the buffer.
                     let str01 = "{\"version\":\"";
                     for i in 0..str01.len() {
                         buffer[index] = str01.as_bytes()[i];
@@ -375,6 +376,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                         index += 1;
                     }
 
+                    // Insert the last half of the JSON blob into the buffer.
                     let str02 = "\", \"name\":\"Tock Bootloader\"}";
                     for i in 0..str02.len() {
                         buffer[index] = str02.as_bytes()[i];
@@ -386,6 +388,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                     buffer[2] = index as u8 - 3;
                     index += 1;
 
+                    // Rest should be 0.
                     for i in index..195 {
                         buffer[i] = 0;
                     }
