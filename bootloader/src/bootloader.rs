@@ -131,9 +131,6 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
         unsafe{
             asm!(
                     ".syntax unified                        \n\
-                    .global jump_into_user_code             \n\
-                    .thumb_func                             \n\
-                jump_into_user_code:                        \n\
                     ldr r0, =0x10000    // The address of the payload's .vectors                                       \n\
                     ldr r1, =0xe000ed08 // The address of the VTOR register (0xE000E000(SCS) + 0xD00(SCB) + 0x8(VTOR)) \n\
                     str r0, [r1]        // Move the payload's VT address into the VTOR register                        \n\

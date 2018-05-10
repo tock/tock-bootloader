@@ -68,6 +68,9 @@ ifneq ($(shell rustup target list | grep "$(TARGET) (installed)"),$(TARGET) (ins
   $(shell rustup target add $(TARGET))
 endif
 
+# Need some dummy value here
+export TOCK_KERNEL_VERSION=5
+
 # Dump configuration for verbose builds
 ifneq ($(V),)
   $(info )
