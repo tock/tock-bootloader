@@ -14,8 +14,8 @@ use kernel::hil;
 use kernel::hil::Controller;
 use kernel::Platform;
 
-#[macro_use]
-pub mod io;
+use core::fmt::*;
+use core::str;
 
 include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
 
@@ -143,3 +143,10 @@ pub unsafe fn reset_handler() {
 
     kernel::main(&hail, &mut chip, &mut PROCESSES, &hail.ipc);
 }
+
+/// Panic handler.
+#[cfg(not(test))]
+#[no_mangle]
+#[lang = "panic_fmt"]
+pub unsafe extern "C" fn panic_fmt(_args: Arguments, _file: &'static str, _line: u32) {}
+
