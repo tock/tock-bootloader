@@ -4,29 +4,22 @@ The Tock bootloader provides a utility for flashing applications onto
 a board over USB. It is compatible with the
 [tockloader](https://github.com/helena-project/tockloader) utility.
 
-The Tock bootloader is based on the Berkeley SDB Storm bootloader.
+The Tock bootloader is implemented on top of the Tock OS itself.
 
 
 Compiling
 ---------
 
 ```bash
-make [hail|imix|justjump]
+cd boards/<board name>
+make
 ```
 
 and to flash:
 
 ```bash
-tockloader flash --address 0 --jtag --arch [board arch] --board [board name] --jtag-device [JLinkExe Device] build/[board]_bootloader.bin
+make flash
 ```
-
-Bootloader Modes
-----------------
-
-- `justjump`: In this mode, there is no ability to upload apps or talk to the board.
-  On boot, the bootloader just jumps directly to address 0x10000.
-- `hail`: Bootloader with the pins correctly mapped for the hail board.
-- `imix`: Bootloader with the pins correctly mapped for the imix board.
 
 
 Bootloader Operation
@@ -357,8 +350,6 @@ Future Goals
 The bootloader is stable, but there are future improvements we would like
 to see added:
 
-- Written in Rust. The bootloader should be a special version of the TockOS
-kernel and leverage the memory protection guarantees that Rust can provide.
 - Arbitrary code start location. Right now the bootloader assumes that the main
 application code is at address `0x10000`, and that is currently a hardcoded
 value. This should ideally be a special flag that can get updated if we want

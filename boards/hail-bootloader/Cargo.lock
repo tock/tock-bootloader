@@ -18,7 +18,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "capsules"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ac7782aad316da111203d0f281ac31cc6d546bdf"
+source = "git+https://github.com/tock/tock#871e1dbd1e247d1d5a97714a60014780c5844331"
 dependencies = [
  "kernel 0.1.0 (git+https://github.com/tock/tock)",
 ]
@@ -26,7 +26,7 @@ dependencies = [
 [[package]]
 name = "cortexm4"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ac7782aad316da111203d0f281ac31cc6d546bdf"
+source = "git+https://github.com/tock/tock#871e1dbd1e247d1d5a97714a60014780c5844331"
 dependencies = [
  "kernel 0.1.0 (git+https://github.com/tock/tock)",
 ]
@@ -46,12 +46,12 @@ dependencies = [
 [[package]]
 name = "kernel"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ac7782aad316da111203d0f281ac31cc6d546bdf"
+source = "git+https://github.com/tock/tock#871e1dbd1e247d1d5a97714a60014780c5844331"
 
 [[package]]
 name = "sam4l"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ac7782aad316da111203d0f281ac31cc6d546bdf"
+source = "git+https://github.com/tock/tock#871e1dbd1e247d1d5a97714a60014780c5844331"
 dependencies = [
  "cortexm4 0.1.0 (git+https://github.com/tock/tock)",
  "kernel 0.1.0 (git+https://github.com/tock/tock)",
