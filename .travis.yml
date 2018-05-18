@@ -1,0 +1,29 @@
+sudo: false
+language: rust
+
+cache:
+  cargo: true
+  directories:
+    - $HOME/gcc-arm-none-eabi-6_2-2016q4
+    - $HOME/local_cargo
+
+os:
+  - linux
+
+# If you change this, you must also change Getting_Started.md, Makefile.common,
+# and Vagrantfile.
+#rust:
+#  - nightly-2018-04-19
+
+before_install:
+  - tools/travis-install-gcc.sh
+  - export PATH="$PATH:$HOME/gcc-arm-none-eabi-6_2-2016q4/bin"
+
+before_script:
+  - tools/install_cargo_fmt.sh
+
+script:
+  - export PATH=$HOME/.cargo/bin:$PATH
+  - tools/run_cargo_fmt.sh diff
+  - make -C boards/hail-bootloader
+
