@@ -132,7 +132,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
     }
 
     fn jump(&self) {
-        unsafe{
+        unsafe {
             asm!(
                     ".syntax unified                        \n\
                     ldr r0, =0x10000    // The address of the payload's .vectors                                       \n\
