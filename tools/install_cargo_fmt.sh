@@ -2,10 +2,6 @@
 
 set -e
 
-cargo --version
-rustc --version
-
-
 # Verify that we're running in the base directory
 if [ ! -x tools/run_cargo_fmt.sh ]; then
 	echo ERROR: $0 must be run from the tock repository root.
