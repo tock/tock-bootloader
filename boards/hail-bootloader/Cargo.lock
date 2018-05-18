@@ -1,0 +1,74 @@
+[[package]]
+name = "bootloader"
+version = "0.1.0"
+dependencies = [
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "tockloader-proto 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "bootloader_attributes"
+version = "0.1.0"
+
+[[package]]
+name = "byteorder"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "capsules"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#871e1dbd1e247d1d5a97714a60014780c5844331"
+dependencies = [
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "cortexm4"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#871e1dbd1e247d1d5a97714a60014780c5844331"
+dependencies = [
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "hailbootloader"
+version = "0.1.0"
+dependencies = [
+ "bootloader 0.1.0",
+ "bootloader_attributes 0.1.0",
+ "capsules 0.1.0 (git+https://github.com/tock/tock)",
+ "cortexm4 0.1.0 (git+https://github.com/tock/tock)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "sam4l 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "kernel"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#871e1dbd1e247d1d5a97714a60014780c5844331"
+
+[[package]]
+name = "sam4l"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#871e1dbd1e247d1d5a97714a60014780c5844331"
+dependencies = [
+ "cortexm4 0.1.0 (git+https://github.com/tock/tock)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "tockloader-proto"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "byteorder 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[metadata]
+"checksum byteorder 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "73b5bdfe7ee3ad0b99c9801d58807a9dbc9e09196365b0203853b99889ab3c87"
+"checksum capsules 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum cortexm4 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum kernel 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum sam4l 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum tockloader-proto 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8997ca9de041a35f8322bb9f5e72785e7bf2413198f17a475ab9a90c3cc102d8"

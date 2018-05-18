@@ -1,0 +1,4 @@
+[package]
+authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
+name = "bootloader_attributes"
+version = "0.1.0"
