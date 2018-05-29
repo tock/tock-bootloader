@@ -258,7 +258,7 @@ Get an attribute at a given index from the internal flash.
 | Index         |
 +-+-+-+-+-+-+-+-+
 ```
-- `Command`: `0x13`.
+- `Command`: `0x14`.
 - `Index`: The attribute index to get. 0-15.
 
 ##### Response
@@ -296,7 +296,7 @@ Get the CRC of a range of internal flash.
 | Length                                                        |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
-- `Command`: `0x13`.
+- `Command`: `0x15`.
 - `Address`: The address to begin the CRC at. Little endian.
 - `Length`: The length of the range to calculate the CRC over.
 
