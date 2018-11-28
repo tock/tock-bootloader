@@ -1,9 +1,8 @@
 /* Memory Spaces Definitions, 448K flash, 64K ram */
-ROM_ORIGIN  = 0x00000000;
-ROM_LENGTH  = 0x00010000;
-RAM_ORIGIN  = 0x20000000;
-RAM_LENGTH  = 0x00020000;
-
-MPU_MIN_ALIGN = 8K;
+MEMORY
+{
+  rom (rx)  : ORIGIN = 0x00000000, LENGTH = 0x00010000
+  ram (rwx) : ORIGIN = 0x20000000, LENGTH = 0x00020000
+}
 
 INCLUDE ../kernel_layout.ld
