@@ -2,7 +2,8 @@
 
 use core::cell::Cell;
 use core::cmp;
-use kernel::common::take_cell::TakeCell;
+
+use kernel::common::cells::TakeCell;
 use kernel::hil;
 
 use bootloader_crc;
@@ -55,7 +56,7 @@ enum State {
 
 pub struct Bootloader<
     'a,
-    U: hil::uart::UARTAdvanced + 'a,
+    U: hil::uart::UARTReceiveAdvanced + 'a,
     F: hil::flash::Flash + 'static,
     G: hil::gpio::Pin + 'a,
 > {
@@ -67,7 +68,7 @@ pub struct Bootloader<
     state: Cell<State>,
 }
 
-impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
+impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
     Bootloader<'a, U, F, G>
 {
     pub fn new(
@@ -89,7 +90,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
 
     pub fn initialize(&self) {
         // Setup UART and start listening.
-        self.uart.init(hil::uart::UARTParams {
+        self.uart.configure(hil::uart::UARTParameters {
             baud_rate: 115200,
             stop_bits: hil::uart::StopBits::One,
             parity: hil::uart::Parity::None,
@@ -147,7 +148,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
     }
 }
 
-impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
+impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
     hil::uart::Client for Bootloader<'a, U, F, G>
 {
     fn transmit_complete(&self, buffer: &'static mut [u8], error: hil::uart::Error) {
@@ -344,7 +345,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
     }
 }
 
-impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
+impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
     hil::flash::Client<F> for Bootloader<'a, U, F, G>
 {
     fn read_complete(&self, pagebuffer: &'static mut F::Page, _error: hil::flash::Error) {

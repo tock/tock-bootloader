@@ -1,0 +1,118 @@
+[[package]]
+name = "bootloader"
+version = "0.1.0"
+dependencies = [
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "tockloader-proto 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "bootloader_attributes"
+version = "0.1.0"
+
+[[package]]
+name = "byteorder"
+version = "1.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "capsules"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+dependencies = [
+ "enum_primitive 0.1.0 (git+https://github.com/tock/tock)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "cortexm"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+dependencies = [
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "cortexm4"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+dependencies = [
+ "cortexm 0.1.0 (git+https://github.com/tock/tock)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "enum_primitive"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+
+[[package]]
+name = "kernel"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+dependencies = [
+ "tock-cells 0.1.0 (git+https://github.com/tock/tock)",
+ "tock-registers 0.2.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "nrf52"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+dependencies = [
+ "cortexm4 0.1.0 (git+https://github.com/tock/tock)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "nrf5x 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "nrf52bootloader"
+version = "0.1.0"
+dependencies = [
+ "bootloader 0.1.0",
+ "bootloader_attributes 0.1.0",
+ "capsules 0.1.0 (git+https://github.com/tock/tock)",
+ "cortexm4 0.1.0 (git+https://github.com/tock/tock)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "nrf52 0.1.0 (git+https://github.com/tock/tock)",
+ "nrf5x 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "nrf5x"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+dependencies = [
+ "kernel 0.1.0 (git+https://github.com/tock/tock)",
+]
+
+[[package]]
+name = "tock-cells"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+
+[[package]]
+name = "tock-registers"
+version = "0.2.0"
+source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+
+[[package]]
+name = "tockloader-proto"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[metadata]
+"checksum byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "94f88df23a25417badc922ab0f5716cc1330e87f71ddd9203b3a3ccd9cedf75d"
+"checksum capsules 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum cortexm 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum cortexm4 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum enum_primitive 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum kernel 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum nrf52 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum nrf5x 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum tock-cells 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum tock-registers 0.2.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum tockloader-proto 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8997ca9de041a35f8322bb9f5e72785e7bf2413198f17a475ab9a90c3cc102d8"

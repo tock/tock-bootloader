@@ -24,26 +24,34 @@
  */
 
 
-/*
- * CCFG - Customer Configuration
- *
- * Chip specific to TI family chips. It is a configuration area
- * needed to validate the image - otherwise it is not possible to boot.
- */
-CCFG_ORIGIN = DEFINED(CCFG_ORIGIN) ? CCFG_ORIGIN : 0;
-CCFG_LENGTH = DEFINED(CCFG_LENGTH) ? CCFG_LENGTH : 0;
-
-MEMORY
-{
-  rom (rx)  : ORIGIN =  ROM_ORIGIN, LENGTH =  ROM_LENGTH
-  ccfg (rx) : ORIGIN = CCFG_ORIGIN, LENGTH = CCFG_LENGTH
-  ram (rwx) : ORIGIN =  RAM_ORIGIN, LENGTH =  RAM_LENGTH
-}
-
-__stack_size__ = DEFINED(__stack_size__) ? __stack_size__ : 0x1000;
-
 SECTIONS
 {
+    .stack (NOLOAD) :
+    {
+        /* Kernel stack.
+         *
+         * Tock places the kernel stack at the bottom of SRAM so that the
+         * kernel will trigger memory fault if it exceeds its stack depth,
+         * rather than silently overwriting valuable data.
+         */
+        . = ALIGN(8);
+         _sstack = .;
+
+         /* For GNU LD, we can just advance the location pointer (".") here to
+          * reserve space for the stack. That, however, doesn't seem to work
+          * for LLVM LLD. The resulting ELF has a stack section that shows the
+          * correct size, but the next section (in our case .relocate) is not
+          * moved down as well, instead it sits at the same address as .stack.
+          * To work around this, we declare a dummy buffer and then insert it
+          * here in the .stack section. This sets the stack size correctly and
+          * places the .relocate section at the correct address. */
+         KEEP(*(.stack_buffer))
+         /*. = . + 0x1000;*/  /*This is the original method. */
+
+         . = ALIGN(8);
+         _estack = .;
+    } > ram
+
     /* STATIC ELEMENTS FOR TOCK KERNEL */
     .vector_table :
     {
@@ -186,23 +194,6 @@ SECTIONS
     .ccfg : {
         KEEP(*(.ccfg))
     } > ccfg
-
-    .stack (NOLOAD) :
-    {
-        /* Kernel stack.
-         *
-         * Tock places the kernel stack at the bottom of SRAM so that the
-         * kernel will trigger memory fault if it exceeds its stack depth,
-         * rather than silently overwriting valuable data.
-         */
-        . = ALIGN(8);
-         _sstack = .;
-
-        . = . + __stack_size__;
-
-        . = ALIGN(8);
-        _estack = .;
-    } > ram
 
 
 
