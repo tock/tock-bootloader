@@ -162,7 +162,7 @@ pub unsafe fn reset_handler() {
             &nrf5x::gpio::PORT[UART_RXD]
             )
         );
-    hil::uart::UART::set_client(&nrf52::uart::UARTE0, recv_auto_uart);
+    // hil::uart::UART::set_client(&nrf52::uart::UARTE0, recv_auto_uart);
     recv_auto_virtual_alarm.set_client(recv_auto_uart);
     nrf5x::gpio::PORT[UART_RXD].set_client(recv_auto_uart);
     recv_auto_uart.initialize();
@@ -248,7 +248,8 @@ pub unsafe fn reset_handler() {
             &mut bootloader::bootloader::BUF
         )
     );
-    hil::uart::UART::set_client(recv_auto_uart, bootloader);
+    hil::uart::UART::set_client(&nrf52::uart::UARTE0, bootloader);
+    // hil::uart::UART::set_client(recv_auto_uart, bootloader);
     hil::flash::HasClient::set_client(&nrf52::nvmc::NVMC, bootloader);
 
 
