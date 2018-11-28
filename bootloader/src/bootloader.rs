@@ -295,7 +295,15 @@ impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: h
                     self.state.set(State::GetAttribute { index: index });
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
-                        self.flash.read_page(3 + (index as usize / 8), page);
+                        // Need to calculate which page to read to get the
+                        // correct attribute (each attribute is 64 bytes long),
+                        // where attributes start at address 0x600.
+                        // let page_len = page.len();
+                        let page_len = 4096;
+                        let read_address = 0x600 + (index as usize * 64);
+                        let page_index = read_address / page_len;
+
+                        self.flash.read_page(page_index, page);
                     });
                     break;
                 }
@@ -321,7 +329,15 @@ impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: h
                     // Initiate things by reading the correct flash page that
                     // needs to be updated.
                     self.page_buffer.take().map(move |page| {
-                        self.flash.read_page(3 + (index as usize / 8), page);
+                        // Need to calculate which page to read to get the
+                        // correct attribute (each attribute is 64 bytes long),
+                        // where attributes start at address 0x600.
+                        // let page_len = page.len();
+                        let page_len = 4096;
+                        let read_address = 0x600 + (index as usize * 64);
+                        let page_index = read_address / page_len;
+
+                        self.flash.read_page(page_index, page);
                     });
                     break;
                 }
@@ -407,8 +423,17 @@ impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: h
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_GET_ATTR;
                     let mut j = 2;
+
+                    // Need to calculate where in the page to look for this
+                    // attribute with attributes starting at address 0x600 and
+                    // where each has length of 64 bytes.
+                    // let page_len = pagebuffer.len();
+                    let page_len = 4096;
+                    let read_address = 0x600 + (index as usize * 64);
+                    let page_index = read_address % page_len;
+
                     for i in 0..64 {
-                        let b = pagebuffer.as_mut()[(((index as usize) % 8) * 64) + i];
+                        let b = pagebuffer.as_mut()[page_index + i];
                         if b == ESCAPE_CHAR {
                             // Need to escape the escape character.
                             buffer[j] = ESCAPE_CHAR;
