@@ -6,7 +6,6 @@
 #![no_std]
 #![no_main]
 #![feature(panic_implementation)]
-#![deny(missing_docs)]
 
 extern crate capsules;
 #[allow(unused_imports)]
@@ -29,10 +28,10 @@ use kernel::hil;
 use nrf5x::rtc::Rtc;
 
 // // The nRF52840DK LEDs (see back of board)
-// const LED1_PIN: usize = 13;
-// const LED2_PIN: usize = 14;
-// const LED3_PIN: usize = 15;
-// const LED4_PIN: usize = 16;
+const LED1_PIN: usize = 13;
+const LED2_PIN: usize = 14;
+const LED3_PIN: usize = 15;
+const LED4_PIN: usize = 16;
 
 // The nRF52840DK buttons (see back of board)
 const BUTTON1_PIN: usize = 11;
@@ -50,8 +49,9 @@ const UART_RXD: usize = 8;
 // const SPI_MISO: usize = 21;
 // const SPI_CLK: usize = 19;
 
-static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; 0] =
-    [];
+include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
+
+static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; 0] = [];
 
 /// Dummy buffer that causes the linker to reserve enough space for the stack.
 #[no_mangle]
@@ -62,7 +62,7 @@ pub static mut STACK_MEMORY: [u8; 0x1000] = [0; 0x1000];
 pub struct Nrf52Bootloader {
     bootloader: &'static bootloader::bootloader::Bootloader<
         'static,
-        bootloader::uart_receive_timeout::UartReceiveTimeout,
+        bootloader::uart_receive_timeout::UartReceiveTimeout<'static, VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>>,
         nrf52::nvmc::Nvmc,
         nrf5x::gpio::GPIOPin,
     >,
@@ -101,6 +101,14 @@ pub unsafe fn reset_handler() {
     let main_loop_capability = create_capability!(capabilities::MainLoopCapability);
     // let memory_allocation_capability = create_capability!(capabilities::MemoryAllocationCapability);
 
+
+    kernel::debug::assign_gpios(
+        Some(&nrf5x::gpio::PORT[LED1_PIN]),
+        None,
+        None,
+    );
+
+
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
     let rtc = &nrf5x::rtc::RTC;
@@ -112,12 +120,52 @@ pub unsafe fn reset_handler() {
     rtc.set_client(mux_alarm);
 
 
+    let led_pins = static_init!(
+        [(&'static nrf5x::gpio::GPIOPin, capsules::led::ActivationMode); 4],
+        [
+            (
+                &nrf5x::gpio::PORT[LED1_PIN],
+                capsules::led::ActivationMode::ActiveLow
+            ),
+            (
+                &nrf5x::gpio::PORT[LED2_PIN],
+                capsules::led::ActivationMode::ActiveLow
+            ),
+            (
+                &nrf5x::gpio::PORT[LED3_PIN],
+                capsules::led::ActivationMode::ActiveLow
+            ),
+            (
+                &nrf5x::gpio::PORT[LED4_PIN],
+                capsules::led::ActivationMode::ActiveLow
+            ),
+        ]
+    );
 
-    let console_recv_auto_uart = static_init!(
-        bootloader::uart_receive_timeout::UartReceiveTimeout,
-        bootloader::uart_receive_timeout::UartReceiveTimeout::new(&nrf52::uart::UARTE0)
+    // LEDs
+    let led = static_init!(
+        capsules::led::LED<'static, nrf5x::gpio::GPIOPin>,
+        capsules::led::LED::new(led_pins)
+    );
+
+
+    let recv_auto_virtual_alarm = static_init!(
+        VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
+        VirtualMuxAlarm::new(mux_alarm)
+    );
+
+    let recv_auto_uart = static_init!(
+        bootloader::uart_receive_timeout::UartReceiveTimeout<'static, VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>>,
+        bootloader::uart_receive_timeout::UartReceiveTimeout::new(&nrf52::uart::UARTE0,
+            recv_auto_virtual_alarm,
+            // &nrf5x::pinmux::Pinmux::new(UART_RXD as u32)
+            &nrf5x::gpio::PORT[UART_RXD]
+            )
         );
-    hil::uart::UART::set_client(&nrf52::uart::UARTE0, console_recv_auto_uart);
+    hil::uart::UART::set_client(&nrf52::uart::UARTE0, recv_auto_uart);
+    recv_auto_virtual_alarm.set_client(recv_auto_uart);
+    nrf5x::gpio::PORT[UART_RXD].set_client(recv_auto_uart);
+    recv_auto_uart.initialize();
 
     // Setup the UART pins
     nrf52::uart::UARTE0.initialize(
@@ -131,12 +179,12 @@ pub unsafe fn reset_handler() {
     // let uart_mux = static_init!(
     //     UartMux<'static>,
     //     UartMux::new(
-    //         console_recv_auto_uart,
+    //         recv_auto_uart,
     //         &mut capsules::virtual_uart::RX_BUF,
     //         115200
     //     )
     // );
-    // hil::uart::UART::set_client(console_recv_auto_uart, uart_mux);
+    // hil::uart::UART::set_client(recv_auto_uart, uart_mux);
 
 
     // // Create virtual device for kernel debug.
@@ -188,19 +236,19 @@ pub unsafe fn reset_handler() {
     let bootloader = static_init!(
         bootloader::bootloader::Bootloader<
             'static,
-            bootloader::uart_receive_timeout::UartReceiveTimeout,
+            bootloader::uart_receive_timeout::UartReceiveTimeout<'static, VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>>,
             nrf52::nvmc::Nvmc,
             nrf5x::gpio::GPIOPin,
         >,
         bootloader::bootloader::Bootloader::new(
-            console_recv_auto_uart,
+            recv_auto_uart,
             &mut nrf52::nvmc::NVMC,
             &nrf5x::gpio::PORT[BUTTON1_PIN],
             &mut PAGEBUFFER,
             &mut bootloader::bootloader::BUF
         )
     );
-    hil::uart::UART::set_client(console_recv_auto_uart, bootloader);
+    hil::uart::UART::set_client(recv_auto_uart, bootloader);
     hil::flash::HasClient::set_client(&nrf52::nvmc::NVMC, bootloader);
 
 
@@ -232,7 +280,7 @@ pub unsafe fn reset_handler() {
 
     // debug!("Initialization complete. Entering main loop\r");
 
-
+    platform.bootloader.initialize();
 
     board_kernel.kernel_loop(&platform, chip, None, &main_loop_capability);
 }
