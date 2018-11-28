@@ -3,7 +3,7 @@ name = "bootloader"
 version = "0.1.0"
 dependencies = [
  "kernel 0.1.0 (git+https://github.com/tock/tock)",
- "tockloader-proto 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tockloader-proto 0.2.1 (git+https://github.com/tock/tockloader-proto-rs)",
 ]
 
 [[package]]
@@ -18,7 +18,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "capsules"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock#616cb87ef9ea1829fd7ce2d222a218371090e8fc"
 dependencies = [
  "enum_primitive 0.1.0 (git+https://github.com/tock/tock)",
  "kernel 0.1.0 (git+https://github.com/tock/tock)",
@@ -27,7 +27,7 @@ dependencies = [
 [[package]]
 name = "cortexm"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock#616cb87ef9ea1829fd7ce2d222a218371090e8fc"
 dependencies = [
  "kernel 0.1.0 (git+https://github.com/tock/tock)",
 ]
@@ -35,7 +35,7 @@ dependencies = [
 [[package]]
 name = "cortexm4"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock#616cb87ef9ea1829fd7ce2d222a218371090e8fc"
 dependencies = [
  "cortexm 0.1.0 (git+https://github.com/tock/tock)",
  "kernel 0.1.0 (git+https://github.com/tock/tock)",
@@ -44,12 +44,12 @@ dependencies = [
 [[package]]
 name = "enum_primitive"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock#616cb87ef9ea1829fd7ce2d222a218371090e8fc"
 
 [[package]]
 name = "kernel"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock#616cb87ef9ea1829fd7ce2d222a218371090e8fc"
 dependencies = [
  "tock-cells 0.1.0 (git+https://github.com/tock/tock)",
  "tock-registers 0.2.0 (git+https://github.com/tock/tock)",
@@ -58,7 +58,7 @@ dependencies = [
 [[package]]
 name = "nrf52"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock#616cb87ef9ea1829fd7ce2d222a218371090e8fc"
 dependencies = [
  "cortexm4 0.1.0 (git+https://github.com/tock/tock)",
  "kernel 0.1.0 (git+https://github.com/tock/tock)",
@@ -81,7 +81,7 @@ dependencies = [
 [[package]]
 name = "nrf5x"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock#616cb87ef9ea1829fd7ce2d222a218371090e8fc"
 dependencies = [
  "kernel 0.1.0 (git+https://github.com/tock/tock)",
 ]
@@ -89,17 +89,17 @@ dependencies = [
 [[package]]
 name = "tock-cells"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock#616cb87ef9ea1829fd7ce2d222a218371090e8fc"
 
 [[package]]
 name = "tock-registers"
 version = "0.2.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock#616cb87ef9ea1829fd7ce2d222a218371090e8fc"
 
 [[package]]
 name = "tockloader-proto"
 version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/tock/tockloader-proto-rs#945aedf6efb77221bc014ed590c56ff934ccdcac"
 dependencies = [
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -115,4 +115,4 @@ dependencies = [
 "checksum nrf5x 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
 "checksum tock-cells 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
 "checksum tock-registers 0.2.0 (git+https://github.com/tock/tock)" = "<none>"
-"checksum tockloader-proto 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8997ca9de041a35f8322bb9f5e72785e7bf2413198f17a475ab9a90c3cc102d8"
+"checksum tockloader-proto 0.2.1 (git+https://github.com/tock/tockloader-proto-rs)" = "<none>"

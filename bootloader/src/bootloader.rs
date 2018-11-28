@@ -11,6 +11,7 @@ use bootloader_crc;
 extern crate tockloader_proto;
 
 // Main buffer that commands are received into and sent from.
+// Need a buffer big enough for 4096 byte pages on the nRF52.
 pub static mut BUF: [u8; 4224] = [0; 4224];
 
 // How long to wait, in bit periods, after receiving a byte for the next
@@ -66,8 +67,6 @@ pub struct Bootloader<
     uart: &'a U,
     flash: &'a F,
     select_pin: &'a G,
-    // decoder: TakeCell<'static, &'static tockloader_proto::CommandDecoder>,
-    // decoder: &'static mut tockloader_proto::CommandDecoder,
     page_buffer: TakeCell<'static, F::Page>,
     buffer: TakeCell<'static, [u8]>,
     state: Cell<State>,
@@ -84,8 +83,6 @@ impl<
         uart: &'a U,
         flash: &'a F,
         select_pin: &'a G,
-        // decoder: &'static mut &'static tockloader_proto::CommandDecoder,
-        // decoder: &'static mut tockloader_proto::CommandDecoder,
         page_buffer: &'static mut F::Page,
         buffer: &'static mut [u8],
     ) -> Bootloader<'a, U, F, G> {
@@ -93,8 +90,6 @@ impl<
             uart: uart,
             flash: flash,
             select_pin: select_pin,
-            // decoder: TakeCell::new(decoder),
-            // decoder: decoder,
             page_buffer: TakeCell::new(page_buffer),
             buffer: TakeCell::new(buffer),
             state: Cell::new(State::Idle),
@@ -203,206 +198,187 @@ impl<
 
     fn receive_complete(&self, buffer: &'static mut [u8], rx_len: usize, error: hil::uart::Error) {
         if error != hil::uart::Error::CommandComplete {
-    // debug_gpio!(0, clear);
-            // self.led.clear();
             return;
         }
 
-        // self.decoder.map(|decoder| {
+        // Tool to parse incoming bootloader messages.
+        // This is currently allocated on the stack, but it too needs a big
+        // buffer, and we need to do something about that.
+        let mut decoder = tockloader_proto::CommandDecoder::new();
+        // Whether we want to reset the position in the buffer in the
+        // decoder.
+        let mut need_reset = false;
 
-
-
-            // self.decoder.reset();
-
-            // Tool to parse incoming bootloader messages.
-            let mut decoder = tockloader_proto::CommandDecoder::new();
-            // Whether we want to reset the position in the buffer in the
-            // decoder.
-            let mut need_reset = false;
-
-
-            // Loop through the buffer and pass it to the decoder.
-            for i in 0..rx_len {
-                // Artifact of the original implementation of the bootloader
-                // protocol is the need to reset the pointer internal to the
-                // bootloader receive state machine. This is here because we may
-                // have received two commands in the same buffer and we want to
-                // handle them both back-to-back.
-                if need_reset {
-                    decoder.reset();
-                    need_reset = false;
-                }
-
-                match decoder.receive(buffer[i]) {
-                    Ok(None) => {
-                   }
-                    Ok(Some(tockloader_proto::Command::Ping)) => {
-                        self.buffer.replace(buffer);
-                        self.send_response(RES_PONG);
-                        break;
-                    }
-                    Ok(Some(tockloader_proto::Command::Reset)) => {
-                        need_reset = true;
-    // debug_gpio!(0, clear);
-                        // If there are more bytes in the buffer we want to continue
-                        // parsing those. Otherwise, we want to go back to receive.
-                        if i == rx_len - 1 {
-            // debug_gpio!(0, clear);
-                            self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
-                            break;
-                        }
-                    }
-                    Ok(Some(tockloader_proto::Command::Info)) => {
-                        self.state.set(State::Info);
-                        self.buffer.replace(buffer);
-                        self.page_buffer.take().map(move |page| {
-                            // Calculate the page index given that flags start
-                            // at address 1024.
-                            let page_index = FLAGS_ADDRESS / page.as_mut().len();
-
-                            self.flash.read_page(page_index, page);
-                        });
-                        break;
-                    }
-                    Ok(Some(tockloader_proto::Command::ReadRange { address, length })) => {
-                        self.state.set(State::ReadRange {
-                            address,
-                            length,
-                            remaining_length: length,
-                        });
-                        self.buffer.replace(buffer);
-                        self.page_buffer.take().map(move |page| {
-                            let page_size = page.as_mut().len();
-                            self.flash.read_page(address as usize / page_size, page);
-                        });
-                        break;
-                    }
-                    Ok(Some(tockloader_proto::Command::WritePage { address, data })) => {
-        // debug_gpio!(0, clear);
-                        self.page_buffer.take().map(move |page| {
-                            let page_size = page.as_mut().len();
-                            if page_size != data.len() {
-    if data.len() -1 == page_size {
-        debug_gpio!(0, clear);
-    }
-                                // Error if we didn't get exactly a page of data
-                                // to write to flash.
-                                buffer[0] = ESCAPE_CHAR;
-                                buffer[1] = RES_BADARGS;
-                                self.page_buffer.replace(page);
-                                self.state.set(State::Idle);
-                                self.uart.transmit(buffer, 2);
-                            } else {
-                                // Otherwise copy into page buffer and write to
-                                // flash.
-                                for i in 0..page_size {
-                                    page.as_mut()[i] = data[i];
-                                }
-                                self.state.set(State::WriteFlashPage);
-                                self.buffer.replace(buffer);
-                                self.flash.write_page(address as usize / page_size, page);
-                            }
-                        });
-                        break;
-                    }
-                    Ok(Some(tockloader_proto::Command::ErasePage { address })) => {
-                        self.state.set(State::ErasePage);
-                        self.buffer.replace(buffer);
-                        let page_size = self.page_buffer.map_or(512, |page| page.as_mut().len());
-                        self.flash.erase_page(address as usize / page_size);
-                        break;
-                    }
-                    Ok(Some(tockloader_proto::Command::CrcIntFlash { address, length })) => {
-                        self.state.set(State::Crc {
-                            address,
-                            remaining_length: length,
-                            crc: 0xFFFFFFFF,
-                        });
-                        self.buffer.replace(buffer);
-                        self.page_buffer.take().map(move |page| {
-                            let page_size = page.as_mut().len();
-                            self.flash.read_page(address as usize / page_size, page);
-                        });
-                        break;
-                    }
-                    Ok(Some(tockloader_proto::Command::GetAttr { index })) => {
-        // debug_gpio!(0, clear);
-                        self.state.set(State::GetAttribute { index: index });
-                        self.buffer.replace(buffer);
-                        self.page_buffer.take().map(move |page| {
-                            // Need to calculate which page to read to get the
-                            // correct attribute (each attribute is 64 bytes long),
-                            // where attributes start at address 0x600.
-                            let page_len = page.as_mut().len();
-                            let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
-                            let page_index = read_address / page_len;
-
-                            self.flash.read_page(page_index, page);
-                        });
-                        break;
-                    }
-                    Ok(Some(tockloader_proto::Command::SetAttr { index, key, value })) => {
-        // debug_gpio!(0, clear);
-                        self.state.set(State::SetAttribute { index });
-
-                        // Copy the key and value into the buffer so it can be added
-                        // to the page buffer when needed.
-                        for i in 0..8 {
-                            buffer[i] = key[i];
-                        }
-                        buffer[8] = value.len() as u8;
-                        for i in 0..55 {
-                            // Copy in the value, otherwise clear to zero.
-                            if i < value.len() {
-                                buffer[9 + i] = value[i];
-                            } else {
-                                buffer[9 + i] = 0;
-                            }
-                        }
-                        self.buffer.replace(buffer);
-
-                        // Initiate things by reading the correct flash page that
-                        // needs to be updated.
-                        self.page_buffer.take().map(move |page| {
-                            // Need to calculate which page to read to get the
-                            // correct attribute (each attribute is 64 bytes long),
-                            // where attributes start at address 0x600.
-                            let page_len = page.as_mut().len();
-                            let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
-                            let page_index = read_address / page_len;
-
-                            self.flash.read_page(page_index, page);
-                        });
-                        break;
-                    }
-                    Ok(Some(_)) => {
-        // debug_gpio!(0, clear);
-                        self.buffer.replace(buffer);
-                        self.send_response(RES_UNKNOWN);
-                        break;
-                    }
-                    Err(tockloader_proto::Error::BadArguments) => {
-        // debug_gpio!(0, clear);
-                        self.buffer.replace(buffer);
-                        self.send_response(RES_BADARGS);
-                        break;
-                    }
-                    Err(_) => {
-        // debug_gpio!(0, clear);
-                        self.buffer.replace(buffer);
-                        self.send_response(RES_INTERNAL_ERROR);
-                        break;
-                    }
-                };
-            }
-
-            // Artifact of the original implementation of the bootloader protocol
-            // is the need to reset the pointer internal to the bootloader receive
-            // state machine.
+        // Loop through the buffer and pass it to the decoder.
+        for i in 0..rx_len {
+            // Artifact of the original implementation of the bootloader
+            // protocol is the need to reset the pointer internal to the
+            // bootloader receive state machine. This is here because we may
+            // have received two commands in the same buffer and we want to
+            // handle them both back-to-back.
             if need_reset {
                 decoder.reset();
+                need_reset = false;
             }
-        // });
+
+            match decoder.receive(buffer[i]) {
+                Ok(None) => {
+               }
+                Ok(Some(tockloader_proto::Command::Ping)) => {
+                    self.buffer.replace(buffer);
+                    self.send_response(RES_PONG);
+                    break;
+                }
+                Ok(Some(tockloader_proto::Command::Reset)) => {
+                    need_reset = true;
+                    // If there are more bytes in the buffer we want to continue
+                    // parsing those. Otherwise, we want to go back to receive.
+                    if i == rx_len - 1 {
+                        self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                        break;
+                    }
+                }
+                Ok(Some(tockloader_proto::Command::Info)) => {
+                    self.state.set(State::Info);
+                    self.buffer.replace(buffer);
+                    self.page_buffer.take().map(move |page| {
+                        // Calculate the page index given that flags start
+                        // at address 1024.
+                        let page_index = FLAGS_ADDRESS / page.as_mut().len();
+
+                        self.flash.read_page(page_index, page);
+                    });
+                    break;
+                }
+                Ok(Some(tockloader_proto::Command::ReadRange { address, length })) => {
+                    self.state.set(State::ReadRange {
+                        address,
+                        length,
+                        remaining_length: length,
+                    });
+                    self.buffer.replace(buffer);
+                    self.page_buffer.take().map(move |page| {
+                        let page_size = page.as_mut().len();
+                        self.flash.read_page(address as usize / page_size, page);
+                    });
+                    break;
+                }
+                Ok(Some(tockloader_proto::Command::WritePage { address, data })) => {
+                    self.page_buffer.take().map(move |page| {
+                        let page_size = page.as_mut().len();
+                        if page_size != data.len() {
+                            // Error if we didn't get exactly a page of data
+                            // to write to flash.
+                            buffer[0] = ESCAPE_CHAR;
+                            buffer[1] = RES_BADARGS;
+                            self.page_buffer.replace(page);
+                            self.state.set(State::Idle);
+                            self.uart.transmit(buffer, 2);
+                        } else {
+                            // Otherwise copy into page buffer and write to
+                            // flash.
+                            for i in 0..page_size {
+                                page.as_mut()[i] = data[i];
+                            }
+                            self.state.set(State::WriteFlashPage);
+                            self.buffer.replace(buffer);
+                            self.flash.write_page(address as usize / page_size, page);
+                        }
+                    });
+                    break;
+                }
+                Ok(Some(tockloader_proto::Command::ErasePage { address })) => {
+                    self.state.set(State::ErasePage);
+                    self.buffer.replace(buffer);
+                    let page_size = self.page_buffer.map_or(512, |page| page.as_mut().len());
+                    self.flash.erase_page(address as usize / page_size);
+                    break;
+                }
+                Ok(Some(tockloader_proto::Command::CrcIntFlash { address, length })) => {
+                    self.state.set(State::Crc {
+                        address,
+                        remaining_length: length,
+                        crc: 0xFFFFFFFF,
+                    });
+                    self.buffer.replace(buffer);
+                    self.page_buffer.take().map(move |page| {
+                        let page_size = page.as_mut().len();
+                        self.flash.read_page(address as usize / page_size, page);
+                    });
+                    break;
+                }
+                Ok(Some(tockloader_proto::Command::GetAttr { index })) => {
+                    self.state.set(State::GetAttribute { index: index });
+                    self.buffer.replace(buffer);
+                    self.page_buffer.take().map(move |page| {
+                        // Need to calculate which page to read to get the
+                        // correct attribute (each attribute is 64 bytes long),
+                        // where attributes start at address 0x600.
+                        let page_len = page.as_mut().len();
+                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                        let page_index = read_address / page_len;
+
+                        self.flash.read_page(page_index, page);
+                    });
+                    break;
+                }
+                Ok(Some(tockloader_proto::Command::SetAttr { index, key, value })) => {
+                    self.state.set(State::SetAttribute { index });
+
+                    // Copy the key and value into the buffer so it can be added
+                    // to the page buffer when needed.
+                    for i in 0..8 {
+                        buffer[i] = key[i];
+                    }
+                    buffer[8] = value.len() as u8;
+                    for i in 0..55 {
+                        // Copy in the value, otherwise clear to zero.
+                        if i < value.len() {
+                            buffer[9 + i] = value[i];
+                        } else {
+                            buffer[9 + i] = 0;
+                        }
+                    }
+                    self.buffer.replace(buffer);
+
+                    // Initiate things by reading the correct flash page that
+                    // needs to be updated.
+                    self.page_buffer.take().map(move |page| {
+                        // Need to calculate which page to read to get the
+                        // correct attribute (each attribute is 64 bytes long),
+                        // where attributes start at address 0x600.
+                        let page_len = page.as_mut().len();
+                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                        let page_index = read_address / page_len;
+
+                        self.flash.read_page(page_index, page);
+                    });
+                    break;
+                }
+                Ok(Some(_)) => {
+                    self.buffer.replace(buffer);
+                    self.send_response(RES_UNKNOWN);
+                    break;
+                }
+                Err(tockloader_proto::Error::BadArguments) => {
+                    self.buffer.replace(buffer);
+                    self.send_response(RES_BADARGS);
+                    break;
+                }
+                Err(_) => {
+                    self.buffer.replace(buffer);
+                    self.send_response(RES_INTERNAL_ERROR);
+                    break;
+                }
+            };
+        }
+
+        // Artifact of the original implementation of the bootloader protocol
+        // is the need to reset the pointer internal to the bootloader receive
+        // state machine.
+        if need_reset {
+            decoder.reset();
+        }
 
     }
 }
