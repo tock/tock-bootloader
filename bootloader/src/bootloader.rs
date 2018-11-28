@@ -17,6 +17,8 @@ pub static mut BUF: [u8; 600] = [0; 600];
 // byte before timing out and calling `receive_complete`.
 const UART_RECEIVE_TIMEOUT: u8 = 100;
 
+const FIRST_ATTRIBUTE_ADDRESS: usize = 0x600;
+
 // Bootloader constants
 const ESCAPE_CHAR: u8 = 0xFC;
 
@@ -307,7 +309,7 @@ impl<
                         // correct attribute (each attribute is 64 bytes long),
                         // where attributes start at address 0x600.
                         let page_len = page.as_mut().len();
-                        let read_address = 0x600 + (index as usize * 64);
+                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
                         let page_index = read_address / page_len;
 
                         self.flash.read_page(page_index, page);
@@ -340,7 +342,7 @@ impl<
                         // correct attribute (each attribute is 64 bytes long),
                         // where attributes start at address 0x600.
                         let page_len = page.as_mut().len();
-                        let read_address = 0x600 + (index as usize * 64);
+                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
                         let page_index = read_address / page_len;
 
                         self.flash.read_page(page_index, page);
@@ -438,11 +440,11 @@ impl<
                     // attribute with attributes starting at address 0x600 and
                     // where each has length of 64 bytes.
                     let page_len = pagebuffer.as_mut().len();
-                    let read_address = 0x600 + (index as usize * 64);
-                    let page_index = read_address % page_len;
+                    let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                    let page_offset = read_address % page_len;
 
                     for i in 0..64 {
-                        let b = pagebuffer.as_mut()[page_index + i];
+                        let b = pagebuffer.as_mut()[page_offset + i];
                         if b == ESCAPE_CHAR {
                             // Need to escape the escape character.
                             buffer[j] = ESCAPE_CHAR;
@@ -461,13 +463,17 @@ impl<
             // and then write that all back to flash.
             State::SetAttribute { index } => {
                 self.buffer.map(move |buffer| {
+                    let page_len = pagebuffer.as_mut().len();
+                    let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                    let page_offset = read_address % page_len;
+                    let page_index = read_address / page_len;
+
                     // Copy the first 64 bytes of the buffer into the correct
                     // spot in the page.
-                    let start_index = ((index as usize) % 8) * 64;
                     for i in 0..64 {
-                        pagebuffer.as_mut()[start_index + i] = buffer[i];
+                        pagebuffer.as_mut()[page_offset + i] = buffer[i];
                     }
-                    self.flash.write_page(3 + (index as usize / 8), pagebuffer);
+                    self.flash.write_page(page_index, pagebuffer);
                 });
             }
 

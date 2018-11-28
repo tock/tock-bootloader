@@ -82,7 +82,9 @@ SECTIONS
         /* Remaining attributes */
         KEEP(*(.attributes .attribute.*))
         FILL(0x0)
-        . = _attribute_table_start + 1536;
+        /* This end address needs to be large enough that attributes are
+           on a different page than the start of .text. */
+        . = _attribute_table_start + 3072;
     } > rom
 
     .text :
