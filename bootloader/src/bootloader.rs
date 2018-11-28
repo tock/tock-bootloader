@@ -298,8 +298,7 @@ impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: h
                         // Need to calculate which page to read to get the
                         // correct attribute (each attribute is 64 bytes long),
                         // where attributes start at address 0x600.
-                        // let page_len = page.len();
-                        let page_len = 4096;
+                        let page_len = page.as_mut().len();
                         let read_address = 0x600 + (index as usize * 64);
                         let page_index = read_address / page_len;
 
@@ -332,8 +331,7 @@ impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: h
                         // Need to calculate which page to read to get the
                         // correct attribute (each attribute is 64 bytes long),
                         // where attributes start at address 0x600.
-                        // let page_len = page.len();
-                        let page_len = 4096;
+                        let page_len = page.as_mut().len();
                         let read_address = 0x600 + (index as usize * 64);
                         let page_index = read_address / page_len;
 
@@ -427,8 +425,7 @@ impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: h
                     // Need to calculate where in the page to look for this
                     // attribute with attributes starting at address 0x600 and
                     // where each has length of 64 bytes.
-                    // let page_len = pagebuffer.len();
-                    let page_len = 4096;
+                    let page_len = pagebuffer.as_mut().len();
                     let read_address = 0x600 + (index as usize * 64);
                     let page_index = read_address % page_len;
 
