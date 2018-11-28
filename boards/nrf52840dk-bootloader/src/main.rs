@@ -8,10 +8,10 @@ extern crate capsules;
 #[allow(unused_imports)]
 #[macro_use(create_capability, debug, debug_verbose, debug_gpio, static_init)]
 extern crate kernel;
+extern crate bootloader;
 extern crate cortexm4;
 extern crate nrf52;
 extern crate nrf5x;
-extern crate bootloader;
 
 use core::panic::PanicInfo;
 
@@ -50,7 +50,10 @@ pub static mut STACK_MEMORY: [u8; 0x1000] = [0; 0x1000];
 pub struct Nrf52Bootloader {
     bootloader: &'static bootloader::bootloader::Bootloader<
         'static,
-        bootloader::uart_receive_timeout::UartReceiveTimeout<'static, VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>>,
+        bootloader::uart_receive_timeout::UartReceiveTimeout<
+            'static,
+            VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
+        >,
         nrf52::nvmc::Nvmc,
         nrf5x::gpio::GPIOPin,
     >,
@@ -86,7 +89,6 @@ pub unsafe fn reset_handler() {
     // functions.
     let main_loop_capability = create_capability!(capabilities::MainLoopCapability);
 
-
     // kernel::debug::assign_gpios(
     //     Some(&nrf5x::gpio::PORT[LED1_PIN]),
     //     None,
@@ -109,7 +111,6 @@ pub unsafe fn reset_handler() {
     //     capsules::led::LED::new(led_pins)
     // );
 
-
     // Create main kernel object. This contains the main loop function.
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
@@ -129,12 +130,16 @@ pub unsafe fn reset_handler() {
     );
 
     let recv_auto_uart = static_init!(
-        bootloader::uart_receive_timeout::UartReceiveTimeout<'static, VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>>,
-        bootloader::uart_receive_timeout::UartReceiveTimeout::new(&nrf52::uart::UARTE0,
+        bootloader::uart_receive_timeout::UartReceiveTimeout<
+            'static,
+            VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
+        >,
+        bootloader::uart_receive_timeout::UartReceiveTimeout::new(
+            &nrf52::uart::UARTE0,
             recv_auto_virtual_alarm,
             &nrf5x::gpio::PORT[UART_RXD]
-            )
-        );
+        )
+    );
     recv_auto_virtual_alarm.set_client(recv_auto_uart);
     nrf5x::gpio::PORT[UART_RXD].set_client(recv_auto_uart);
     recv_auto_uart.initialize();
@@ -152,7 +157,10 @@ pub unsafe fn reset_handler() {
     let bootloader = static_init!(
         bootloader::bootloader::Bootloader<
             'static,
-            bootloader::uart_receive_timeout::UartReceiveTimeout<'static, VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>>,
+            bootloader::uart_receive_timeout::UartReceiveTimeout<
+                'static,
+                VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
+            >,
             nrf52::nvmc::Nvmc,
             nrf5x::gpio::GPIOPin,
         >,
@@ -166,8 +174,6 @@ pub unsafe fn reset_handler() {
     );
     hil::uart::UART::set_client(&nrf52::uart::UARTE0, bootloader);
     hil::flash::HasClient::set_client(&nrf52::nvmc::NVMC, bootloader);
-
-
 
     // Start all of the clocks. Low power operation will require a better
     // approach than this.

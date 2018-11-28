@@ -38,7 +38,6 @@ use kernel::hil;
 use kernel::hil::time::Frequency;
 use kernel::ReturnCode;
 
-
 pub struct UartReceiveTimeout<'a, A: hil::time::Alarm + 'a> {
     uart: &'static hil::uart::UART,
     alarm: &'a A,
@@ -61,13 +60,13 @@ impl<'a, A: hil::time::Alarm> UartReceiveTimeout<'a, A> {
     /// Setup the GPIO interrupt to wait for the end of UART bytes.
     pub fn initialize(&self) {
         self.rx_pin.make_input();
-        self.rx_pin.enable_interrupt(0, hil::gpio::InterruptMode::FallingEdge);
+        self.rx_pin
+            .enable_interrupt(0, hil::gpio::InterruptMode::FallingEdge);
     }
 }
 
 impl<'a, A: hil::time::Alarm> hil::uart::UART for UartReceiveTimeout<'a, A> {
-    fn set_client(&self, _client: &'static hil::uart::Client) {
-    }
+    fn set_client(&self, _client: &'static hil::uart::Client) {}
 
     fn configure(&self, params: hil::uart::UARTParameters) -> ReturnCode {
         self.uart.configure(params)
@@ -115,12 +114,15 @@ impl<'a, A: hil::time::Alarm> hil::time::Client for UartReceiveTimeout<'a, A> {
 // Callbacks from the underlying UART driver.
 impl<'a, A: hil::time::Alarm> hil::uart::Client for UartReceiveTimeout<'a, A> {
     // Called when the UART TX has finished.
-    fn transmit_complete(&self, _buffer: &'static mut [u8], _error: hil::uart::Error) {
-
-    }
+    fn transmit_complete(&self, _buffer: &'static mut [u8], _error: hil::uart::Error) {}
 
     // Called when a buffer is received on the UART.
-    fn receive_complete(&self, _buffer: &'static mut [u8], _rx_len: usize, _error: hil::uart::Error) {
+    fn receive_complete(
+        &self,
+        _buffer: &'static mut [u8],
+        _rx_len: usize,
+        _error: hil::uart::Error,
+    ) {
 
     }
 }

@@ -68,8 +68,12 @@ pub struct Bootloader<
     state: Cell<State>,
 }
 
-impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
-    Bootloader<'a, U, F, G>
+impl<
+        'a,
+        U: hil::uart::UARTReceiveAdvanced + 'a,
+        F: hil::flash::Flash + 'a,
+        G: hil::gpio::Pin + 'a,
+    > Bootloader<'a, U, F, G>
 {
     pub fn new(
         uart: &'a U,
@@ -148,8 +152,12 @@ impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: h
     }
 }
 
-impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
-    hil::uart::Client for Bootloader<'a, U, F, G>
+impl<
+        'a,
+        U: hil::uart::UARTReceiveAdvanced + 'a,
+        F: hil::flash::Flash + 'a,
+        G: hil::gpio::Pin + 'a,
+    > hil::uart::Client for Bootloader<'a, U, F, G>
 {
     fn transmit_complete(&self, buffer: &'static mut [u8], error: hil::uart::Error) {
         if error != hil::uart::Error::CommandComplete {
@@ -359,8 +367,12 @@ impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: h
     }
 }
 
-impl<'a, U: hil::uart::UARTReceiveAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
-    hil::flash::Client<F> for Bootloader<'a, U, F, G>
+impl<
+        'a,
+        U: hil::uart::UARTReceiveAdvanced + 'a,
+        F: hil::flash::Flash + 'a,
+        G: hil::gpio::Pin + 'a,
+    > hil::flash::Client<F> for Bootloader<'a, U, F, G>
 {
     fn read_complete(&self, pagebuffer: &'static mut F::Page, _error: hil::flash::Error) {
         match self.state.get() {
