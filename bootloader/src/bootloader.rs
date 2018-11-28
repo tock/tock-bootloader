@@ -17,6 +17,7 @@ pub static mut BUF: [u8; 600] = [0; 600];
 // byte before timing out and calling `receive_complete`.
 const UART_RECEIVE_TIMEOUT: u8 = 100;
 
+const FLAGS_ADDRESS: usize = 0x400;
 const FIRST_ATTRIBUTE_ADDRESS: usize = 0x600;
 
 // Bootloader constants
@@ -218,7 +219,6 @@ impl<
                 need_reset = false;
             }
 
-            // match decoder.receive(buffer[i]) {
             match decoder.receive(buffer[i]) {
                 Ok(None) => {}
                 Ok(Some(tockloader_proto::Command::Ping)) => {
@@ -228,10 +228,11 @@ impl<
                 }
                 Ok(Some(tockloader_proto::Command::Reset)) => {
                     need_reset = true;
-
+// debug_gpio!(0, clear);
                     // If there are more bytes in the buffer we want to continue
                     // parsing those. Otherwise, we want to go back to receive.
                     if i == rx_len - 1 {
+        // debug_gpio!(0, clear);
                         self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
                         break;
                     }
@@ -240,7 +241,11 @@ impl<
                     self.state.set(State::Info);
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
-                        self.flash.read_page(2, page);
+                        // Calculate the page index given that flags start
+                        // at address 1024.
+                        let page_index = FLAGS_ADDRESS / page.as_mut().len();
+
+                        self.flash.read_page(page_index, page);
                     });
                     break;
                 }
@@ -258,6 +263,7 @@ impl<
                     break;
                 }
                 Ok(Some(tockloader_proto::Command::WritePage { address, data })) => {
+    // debug_gpio!(0, clear);
                     self.page_buffer.take().map(move |page| {
                         let page_size = page.as_mut().len();
                         if page_size != data.len() {
@@ -302,6 +308,7 @@ impl<
                     break;
                 }
                 Ok(Some(tockloader_proto::Command::GetAttr { index })) => {
+    // debug_gpio!(0, clear);
                     self.state.set(State::GetAttribute { index: index });
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
@@ -350,10 +357,14 @@ impl<
                     break;
                 }
                 Ok(Some(_)) => {
+    // debug_gpio!(0, clear);
+                    self.buffer.replace(buffer);
                     self.send_response(RES_UNKNOWN);
                     break;
                 }
                 Err(_) => {
+    // debug_gpio!(0, clear);
+                    self.buffer.replace(buffer);
                     self.send_response(RES_INTERNAL_ERROR);
                     break;
                 }
@@ -394,10 +405,13 @@ impl<
                         index += 1;
                     }
 
+                    // Calculate where in the page the flags start.
+                    let page_offset = FLAGS_ADDRESS % pagebuffer.as_mut().len();
+
                     // Version string is at most 8 bytes long, and starts
                     // at index 14 in the bootloader page.
                     for i in 0..8 {
-                        let b = pagebuffer.as_mut()[i + 14];
+                        let b = pagebuffer.as_mut()[i + 14 + page_offset];
                         if b == 0 {
                             break;
                         }
@@ -608,7 +622,6 @@ impl<
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_OK;
-                    // buffer[1] = 0x99;
                     self.uart.transmit(buffer, 2);
                 });
             }

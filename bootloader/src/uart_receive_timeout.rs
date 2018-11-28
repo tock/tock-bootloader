@@ -98,7 +98,7 @@ impl<'a, A: hil::time::Alarm> hil::gpio::Client for UartReceiveTimeout<'a, A> {
     // We start a new timer on every toggle to wait for the end of incoming
     // RX bytes.
     fn fired(&self, _: usize) {
-        let interval = (20 as u32) * <A::Frequency>::frequency() / 1000;
+        let interval = (30 as u32) * <A::Frequency>::frequency() / 1000;
         let tics = self.alarm.now().wrapping_add(interval);
         self.alarm.set_alarm(tics);
     }
