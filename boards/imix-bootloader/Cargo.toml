@@ -1,0 +1,25 @@
+[package]
+name = "imixbootloader"
+version = "0.1.0"
+authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
+build = "build.rs"
+
+[profile.dev]
+panic = "abort"
+lto = true
+opt-level = 0
+debug = true
+
+[profile.release]
+panic = "abort"
+lto = true
+
+[dependencies]
+cortexm4 = { git = "https://github.com/tock/tock" }
+capsules = { git = "https://github.com/tock/tock" }
+kernel = { git = "https://github.com/tock/tock" }
+sam4l = { git = "https://github.com/tock/tock" }
+bootloader = { path = "../../bootloader" }
+
+[build-dependencies]
+bootloader_attributes = { path = "../../tools/bootloader_attributes" }
