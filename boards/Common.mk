@@ -19,9 +19,10 @@ RUSTFLAGS_FOR_CARGO_LINKING := -C link-arg=-Tlayout.ld -C linker=rust-lld \
 
 # Disallow warnings for continuous integration builds. Disallowing them here
 # ensures that warnings during testing won't prevent compilation from succeeding.
-ifeq ($(CI),true)
-  RUSTFLAGS_FOR_CARGO_LINKING += -D warnings
-endif
+# We are OK with warnings in bootloader land!
+# ifeq ($(CI),true)
+#   RUSTFLAGS_FOR_CARGO_LINKING += -D warnings
+# endif
 
 # http://stackoverflow.com/questions/10858261/abort-makefile-if-variable-not-set
 # Check that given variables are set and all have non-empty values,
