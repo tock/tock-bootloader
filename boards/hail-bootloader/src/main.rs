@@ -8,8 +8,8 @@ extern crate bootloader;
 extern crate cortexm4;
 #[macro_use(create_capability, static_init)]
 extern crate kernel;
-extern crate sam4l;
 extern crate capsules;
+extern crate sam4l;
 
 use core::panic::PanicInfo;
 

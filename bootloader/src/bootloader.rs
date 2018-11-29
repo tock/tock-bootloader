@@ -222,8 +222,7 @@ impl<
             }
 
             match decoder.receive(buffer[i]) {
-                Ok(None) => {
-               }
+                Ok(None) => {}
                 Ok(Some(tockloader_proto::Command::Ping)) => {
                     self.buffer.replace(buffer);
                     self.send_response(RES_PONG);
@@ -379,7 +378,6 @@ impl<
         if need_reset {
             decoder.reset();
         }
-
     }
 }
 
