@@ -9,6 +9,7 @@ extern crate cortexm4;
 #[macro_use(create_capability, static_init)]
 extern crate kernel;
 extern crate sam4l;
+extern crate capsules;
 
 use core::panic::PanicInfo;
 
@@ -25,7 +26,7 @@ static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; 0] = [];
 /// Dummy buffer that causes the linker to reserve enough space for the stack.
 #[no_mangle]
 #[link_section = ".stack_buffer"]
-pub static mut STACK_MEMORY: [u8; 0x1000] = [0; 0x1000];
+pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 
 struct HailBootloader {
     bootloader: &'static bootloader::bootloader::Bootloader<
@@ -117,6 +118,9 @@ pub unsafe fn reset_handler() {
 
     // Create main kernel object. This contains the main loop function.
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
+
+    // Initialize USART0 for Uart
+    sam4l::usart::USART0.set_mode(sam4l::usart::UsartMode::Uart);
 
     pub static mut PAGEBUFFER: sam4l::flashcalw::Sam4lPage = sam4l::flashcalw::Sam4lPage::new();
 
