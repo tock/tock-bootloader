@@ -2,7 +2,8 @@
 
 use core::cell::Cell;
 use core::cmp;
-use kernel::common::take_cell::TakeCell;
+
+use kernel::common::cells::TakeCell;
 use kernel::hil;
 
 use bootloader_crc;
@@ -10,11 +11,15 @@ use bootloader_crc;
 extern crate tockloader_proto;
 
 // Main buffer that commands are received into and sent from.
-pub static mut BUF: [u8; 600] = [0; 600];
+// Need a buffer big enough for 4096 byte pages on the nRF52.
+pub static mut BUF: [u8; 4224] = [0; 4224];
 
 // How long to wait, in bit periods, after receiving a byte for the next
 // byte before timing out and calling `receive_complete`.
 const UART_RECEIVE_TIMEOUT: u8 = 100;
+
+const FLAGS_ADDRESS: usize = 0x400;
+const FIRST_ATTRIBUTE_ADDRESS: usize = 0x600;
 
 // Bootloader constants
 const ESCAPE_CHAR: u8 = 0xFC;
@@ -55,7 +60,7 @@ enum State {
 
 pub struct Bootloader<
     'a,
-    U: hil::uart::UARTAdvanced + 'a,
+    U: hil::uart::UARTReceiveAdvanced + 'a,
     F: hil::flash::Flash + 'static,
     G: hil::gpio::Pin + 'a,
 > {
@@ -67,8 +72,12 @@ pub struct Bootloader<
     state: Cell<State>,
 }
 
-impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
-    Bootloader<'a, U, F, G>
+impl<
+        'a,
+        U: hil::uart::UARTReceiveAdvanced + 'a,
+        F: hil::flash::Flash + 'a,
+        G: hil::gpio::Pin + 'a,
+    > Bootloader<'a, U, F, G>
 {
     pub fn new(
         uart: &'a U,
@@ -89,7 +98,7 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
 
     pub fn initialize(&self) {
         // Setup UART and start listening.
-        self.uart.init(hil::uart::UARTParams {
+        self.uart.configure(hil::uart::UARTParameters {
             baud_rate: 115200,
             stop_bits: hil::uart::StopBits::One,
             parity: hil::uart::Parity::None,
@@ -147,8 +156,12 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
     }
 }
 
-impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
-    hil::uart::Client for Bootloader<'a, U, F, G>
+impl<
+        'a,
+        U: hil::uart::UARTReceiveAdvanced + 'a,
+        F: hil::flash::Flash + 'a,
+        G: hil::gpio::Pin + 'a,
+    > hil::uart::Client for Bootloader<'a, U, F, G>
 {
     fn transmit_complete(&self, buffer: &'static mut [u8], error: hil::uart::Error) {
         if error != hil::uart::Error::CommandComplete {
@@ -185,11 +198,12 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
 
     fn receive_complete(&self, buffer: &'static mut [u8], rx_len: usize, error: hil::uart::Error) {
         if error != hil::uart::Error::CommandComplete {
-            // self.led.clear();
             return;
         }
 
         // Tool to parse incoming bootloader messages.
+        // This is currently allocated on the stack, but it too needs a big
+        // buffer, and we need to do something about that.
         let mut decoder = tockloader_proto::CommandDecoder::new();
         // Whether we want to reset the position in the buffer in the
         // decoder.
@@ -207,7 +221,6 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                 need_reset = false;
             }
 
-            // match decoder.receive(buffer[i]) {
             match decoder.receive(buffer[i]) {
                 Ok(None) => {}
                 Ok(Some(tockloader_proto::Command::Ping)) => {
@@ -217,7 +230,6 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                 }
                 Ok(Some(tockloader_proto::Command::Reset)) => {
                     need_reset = true;
-
                     // If there are more bytes in the buffer we want to continue
                     // parsing those. Otherwise, we want to go back to receive.
                     if i == rx_len - 1 {
@@ -229,7 +241,11 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                     self.state.set(State::Info);
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
-                        self.flash.read_page(2, page);
+                        // Calculate the page index given that flags start
+                        // at address 1024.
+                        let page_index = FLAGS_ADDRESS / page.as_mut().len();
+
+                        self.flash.read_page(page_index, page);
                     });
                     break;
                 }
@@ -294,7 +310,14 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                     self.state.set(State::GetAttribute { index: index });
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
-                        self.flash.read_page(3 + (index as usize / 8), page);
+                        // Need to calculate which page to read to get the
+                        // correct attribute (each attribute is 64 bytes long),
+                        // where attributes start at address 0x600.
+                        let page_len = page.as_mut().len();
+                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                        let page_index = read_address / page_len;
+
+                        self.flash.read_page(page_index, page);
                     });
                     break;
                 }
@@ -320,15 +343,29 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                     // Initiate things by reading the correct flash page that
                     // needs to be updated.
                     self.page_buffer.take().map(move |page| {
-                        self.flash.read_page(3 + (index as usize / 8), page);
+                        // Need to calculate which page to read to get the
+                        // correct attribute (each attribute is 64 bytes long),
+                        // where attributes start at address 0x600.
+                        let page_len = page.as_mut().len();
+                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                        let page_index = read_address / page_len;
+
+                        self.flash.read_page(page_index, page);
                     });
                     break;
                 }
                 Ok(Some(_)) => {
+                    self.buffer.replace(buffer);
                     self.send_response(RES_UNKNOWN);
                     break;
                 }
+                Err(tockloader_proto::Error::BadArguments) => {
+                    self.buffer.replace(buffer);
+                    self.send_response(RES_BADARGS);
+                    break;
+                }
                 Err(_) => {
+                    self.buffer.replace(buffer);
                     self.send_response(RES_INTERNAL_ERROR);
                     break;
                 }
@@ -344,8 +381,12 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
     }
 }
 
-impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpio::Pin + 'a>
-    hil::flash::Client<F> for Bootloader<'a, U, F, G>
+impl<
+        'a,
+        U: hil::uart::UARTReceiveAdvanced + 'a,
+        F: hil::flash::Flash + 'a,
+        G: hil::gpio::Pin + 'a,
+    > hil::flash::Client<F> for Bootloader<'a, U, F, G>
 {
     fn read_complete(&self, pagebuffer: &'static mut F::Page, _error: hil::flash::Error) {
         match self.state.get() {
@@ -365,10 +406,13 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                         index += 1;
                     }
 
+                    // Calculate where in the page the flags start.
+                    let page_offset = FLAGS_ADDRESS % pagebuffer.as_mut().len();
+
                     // Version string is at most 8 bytes long, and starts
                     // at index 14 in the bootloader page.
                     for i in 0..8 {
-                        let b = pagebuffer.as_mut()[i + 14];
+                        let b = pagebuffer.as_mut()[i + 14 + page_offset];
                         if b == 0 {
                             break;
                         }
@@ -406,8 +450,16 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_GET_ATTR;
                     let mut j = 2;
+
+                    // Need to calculate where in the page to look for this
+                    // attribute with attributes starting at address 0x600 and
+                    // where each has length of 64 bytes.
+                    let page_len = pagebuffer.as_mut().len();
+                    let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                    let page_offset = read_address % page_len;
+
                     for i in 0..64 {
-                        let b = pagebuffer.as_mut()[(((index as usize) % 8) * 64) + i];
+                        let b = pagebuffer.as_mut()[page_offset + i];
                         if b == ESCAPE_CHAR {
                             // Need to escape the escape character.
                             buffer[j] = ESCAPE_CHAR;
@@ -426,13 +478,17 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
             // and then write that all back to flash.
             State::SetAttribute { index } => {
                 self.buffer.map(move |buffer| {
+                    let page_len = pagebuffer.as_mut().len();
+                    let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                    let page_offset = read_address % page_len;
+                    let page_index = read_address / page_len;
+
                     // Copy the first 64 bytes of the buffer into the correct
                     // spot in the page.
-                    let start_index = ((index as usize) % 8) * 64;
                     for i in 0..64 {
-                        pagebuffer.as_mut()[start_index + i] = buffer[i];
+                        pagebuffer.as_mut()[page_offset + i] = buffer[i];
                     }
-                    self.flash.write_page(3 + (index as usize / 8), pagebuffer);
+                    self.flash.write_page(page_index, pagebuffer);
                 });
             }
 
@@ -567,7 +623,6 @@ impl<'a, U: hil::uart::UARTAdvanced + 'a, F: hil::flash::Flash + 'a, G: hil::gpi
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_OK;
-                    // buffer[1] = 0x99;
                     self.uart.transmit(buffer, 2);
                 });
             }

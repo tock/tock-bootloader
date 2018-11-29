@@ -2,25 +2,31 @@
 
 #![no_std]
 #![no_main]
-#![feature(asm, const_fn, lang_items)]
+#![feature(asm, const_fn, lang_items, panic_implementation)]
 
 extern crate bootloader;
 extern crate cortexm4;
-#[macro_use(static_init)]
+#[macro_use(create_capability, static_init)]
 extern crate kernel;
+extern crate capsules;
 extern crate sam4l;
 
+use core::panic::PanicInfo;
+
+use kernel::capabilities;
 use kernel::hil;
 use kernel::hil::Controller;
 use kernel::Platform;
 
-use core::fmt::*;
-use core::str;
-
 include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
 
 // No processes are supported.
-static mut PROCESSES: [Option<&'static mut kernel::Process<'static>>; 0] = [];
+static mut PROCESSES: [Option<&'static kernel::procs::ProcessType>; 0] = [];
+
+/// Dummy buffer that causes the linker to reserve enough space for the stack.
+#[no_mangle]
+#[link_section = ".stack_buffer"]
+pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 
 struct HailBootloader {
     bootloader: &'static bootloader::bootloader::Bootloader<
@@ -29,7 +35,6 @@ struct HailBootloader {
         sam4l::flashcalw::FLASHCALW,
         sam4l::gpio::GPIOPin,
     >,
-    ipc: kernel::ipc::IPC,
 }
 
 impl Platform for HailBootloader {
@@ -111,6 +116,12 @@ pub unsafe fn reset_handler() {
 
     set_pin_primary_functions();
 
+    // Create main kernel object. This contains the main loop function.
+    let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
+
+    // Initialize USART0 for Uart
+    sam4l::usart::USART0.set_mode(sam4l::usart::UsartMode::Uart);
+
     pub static mut PAGEBUFFER: sam4l::flashcalw::Sam4lPage = sam4l::flashcalw::Sam4lPage::new();
 
     sam4l::flashcalw::FLASH_CONTROLLER.configure();
@@ -134,18 +145,20 @@ pub unsafe fn reset_handler() {
 
     let hail = HailBootloader {
         bootloader: bootloader,
-        ipc: kernel::ipc::IPC::new(),
     };
 
-    let mut chip = sam4l::chip::Sam4l::new();
+    let chip = static_init!(sam4l::chip::Sam4l, sam4l::chip::Sam4l::new());
 
     hail.bootloader.initialize();
 
-    kernel::main(&hail, &mut chip, &mut PROCESSES, &hail.ipc);
+    let main_loop_capability = create_capability!(capabilities::MainLoopCapability);
+    board_kernel.kernel_loop(&hail, chip, None, &main_loop_capability);
 }
 
 /// Panic handler.
 #[cfg(not(test))]
 #[no_mangle]
-#[lang = "panic_fmt"]
-pub unsafe extern "C" fn panic_fmt(_args: Arguments, _file: &'static str, _line: u32) {}
+#[panic_implementation]
+pub unsafe extern "C" fn panic_fmt(_pi: &PanicInfo) -> ! {
+    loop {}
+}
