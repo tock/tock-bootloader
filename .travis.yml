@@ -17,4 +17,5 @@ script:
   - tools/run_cargo_fmt.sh diff
   - make -C boards/hail-bootloader
   - make -C boards/nrf52-bootloader
+  - make -C boards/imix-bootloader
 
