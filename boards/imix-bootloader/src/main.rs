@@ -38,14 +38,12 @@ struct ImixBootloader {
 }
 
 impl Platform for ImixBootloader {
-    fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
+    fn with_driver<F, R>(&self, _driver_num: usize, f: F) -> R
     where
         F: FnOnce(Option<&kernel::Driver>) -> R,
     {
         // Bootloader does not support apps.
-        match driver_num {
-            _ => f(None),
-        }
+        f(None)
     }
 }
 
