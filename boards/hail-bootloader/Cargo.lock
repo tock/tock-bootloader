@@ -2,7 +2,7 @@
 name = "bootloader"
 version = "0.1.0"
 dependencies = [
- "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
  "tockloader-proto 0.2.1 (git+https://github.com/tock/tockloader-proto-rs)",
 ]
 
@@ -18,33 +18,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "capsules"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock?tag=release-1.3#9743146e18f45b7636ba9b9687b28937d6e9f261"
 dependencies = [
- "enum_primitive 0.1.0 (git+https://github.com/tock/tock)",
- "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "enum_primitive 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
 ]
 
 [[package]]
 name = "cortexm"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock?tag=release-1.3#9743146e18f45b7636ba9b9687b28937d6e9f261"
 dependencies = [
- "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
 ]
 
 [[package]]
 name = "cortexm4"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock?tag=release-1.3#9743146e18f45b7636ba9b9687b28937d6e9f261"
 dependencies = [
- "cortexm 0.1.0 (git+https://github.com/tock/tock)",
- "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "cortexm 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
 ]
 
 [[package]]
 name = "enum_primitive"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock?tag=release-1.3#9743146e18f45b7636ba9b9687b28937d6e9f261"
 
 [[package]]
 name = "hailbootloader"
@@ -52,39 +52,39 @@ version = "0.1.0"
 dependencies = [
  "bootloader 0.1.0",
  "bootloader_attributes 0.1.0",
- "capsules 0.1.0 (git+https://github.com/tock/tock)",
- "cortexm4 0.1.0 (git+https://github.com/tock/tock)",
- "kernel 0.1.0 (git+https://github.com/tock/tock)",
- "sam4l 0.1.0 (git+https://github.com/tock/tock)",
+ "capsules 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
+ "cortexm4 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
+ "sam4l 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
 ]
 
 [[package]]
 name = "kernel"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock?tag=release-1.3#9743146e18f45b7636ba9b9687b28937d6e9f261"
 dependencies = [
- "tock-cells 0.1.0 (git+https://github.com/tock/tock)",
- "tock-registers 0.2.0 (git+https://github.com/tock/tock)",
+ "tock-cells 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
+ "tock-registers 0.2.0 (git+https://github.com/tock/tock?tag=release-1.3)",
 ]
 
 [[package]]
 name = "sam4l"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock?tag=release-1.3#9743146e18f45b7636ba9b9687b28937d6e9f261"
 dependencies = [
- "cortexm4 0.1.0 (git+https://github.com/tock/tock)",
- "kernel 0.1.0 (git+https://github.com/tock/tock)",
+ "cortexm4 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
+ "kernel 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)",
 ]
 
 [[package]]
 name = "tock-cells"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock?tag=release-1.3#9743146e18f45b7636ba9b9687b28937d6e9f261"
 
 [[package]]
 name = "tock-registers"
 version = "0.2.0"
-source = "git+https://github.com/tock/tock#ede88f41c8e7073d6115272d52f574526ce4ed9a"
+source = "git+https://github.com/tock/tock?tag=release-1.3#9743146e18f45b7636ba9b9687b28937d6e9f261"
 
 [[package]]
 name = "tockloader-proto"
@@ -96,12 +96,12 @@ dependencies = [
 
 [metadata]
 "checksum byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "94f88df23a25417badc922ab0f5716cc1330e87f71ddd9203b3a3ccd9cedf75d"
-"checksum capsules 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
-"checksum cortexm 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
-"checksum cortexm4 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
-"checksum enum_primitive 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
-"checksum kernel 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
-"checksum sam4l 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
-"checksum tock-cells 0.1.0 (git+https://github.com/tock/tock)" = "<none>"
-"checksum tock-registers 0.2.0 (git+https://github.com/tock/tock)" = "<none>"
+"checksum capsules 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)" = "<none>"
+"checksum cortexm 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)" = "<none>"
+"checksum cortexm4 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)" = "<none>"
+"checksum enum_primitive 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)" = "<none>"
+"checksum kernel 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)" = "<none>"
+"checksum sam4l 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)" = "<none>"
+"checksum tock-cells 0.1.0 (git+https://github.com/tock/tock?tag=release-1.3)" = "<none>"
+"checksum tock-registers 0.2.0 (git+https://github.com/tock/tock?tag=release-1.3)" = "<none>"
 "checksum tockloader-proto 0.2.1 (git+https://github.com/tock/tockloader-proto-rs)" = "<none>"

@@ -86,7 +86,7 @@ impl<'a, A: hil::time::Alarm> hil::uart::UART for UartReceiveTimeout<'a, A> {
 }
 
 impl<'a, A: hil::time::Alarm> hil::uart::UARTReceiveAdvanced for UartReceiveTimeout<'a, A> {
-    fn receive_automatic(&self, rx_buffer: &'static mut [u8], interbyte_timeout: u8) {
+    fn receive_automatic(&self, rx_buffer: &'static mut [u8], _interbyte_timeout: u8) {
         // Just call receive with the entire buffer.
         let len = rx_buffer.len();
         self.uart.receive(rx_buffer, len);

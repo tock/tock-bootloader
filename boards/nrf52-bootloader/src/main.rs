@@ -66,13 +66,11 @@ pub struct Nrf52Bootloader {
 }
 
 impl kernel::Platform for Nrf52Bootloader {
-    fn with_driver<F, R>(&self, driver_num: usize, f: F) -> R
+    fn with_driver<F, R>(&self, _driver_num: usize, f: F) -> R
     where
         F: FnOnce(Option<&kernel::Driver>) -> R,
     {
-        match driver_num {
-            _ => f(None),
-        }
+        f(None)
     }
 }
 
