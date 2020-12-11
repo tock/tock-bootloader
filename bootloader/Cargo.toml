@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
 
 [dependencies]
-kernel = { git = "https://github.com/tock/tock", tag = "release-1.3" }
+#kernel = { git = "https://github.com/tock/tock", branch = "master" }
+kernel = { path = "../../tock/kernel" }
 tockloader-proto = { git = "https://github.com/tock/tockloader-proto-rs" }

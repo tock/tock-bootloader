@@ -60,7 +60,7 @@ enum State {
 
 pub struct Bootloader<
     'a,
-    U: hil::uart::UARTReceiveAdvanced + 'a,
+    U: hil::uart::UartAdvanced<'a> + 'a,
     F: hil::flash::Flash + 'static,
     G: hil::gpio::Pin + 'a,
 > {
@@ -74,7 +74,7 @@ pub struct Bootloader<
 
 impl<
         'a,
-        U: hil::uart::UARTReceiveAdvanced + 'a,
+        U: hil::uart::UartAdvanced<'a> + 'a,
         F: hil::flash::Flash + 'a,
         G: hil::gpio::Pin + 'a,
     > Bootloader<'a, U, F, G>
@@ -98,8 +98,9 @@ impl<
 
     pub fn initialize(&self) {
         // Setup UART and start listening.
-        self.uart.configure(hil::uart::UARTParameters {
+        self.uart.configure(hil::uart::Parameters {
             baud_rate: 115200,
+            width: hil::uart::Width::Eight,
             stop_bits: hil::uart::StopBits::One,
             parity: hil::uart::Parity::None,
             hw_flow_control: false,
@@ -123,7 +124,8 @@ impl<
         if active > inactive {
             // Looks like we do want bootloader mode.
             self.buffer.take().map(|buffer| {
-                self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                self.uart
+                    .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
             });
         } else {
             // Jump to the kernel and start the real code.
@@ -136,7 +138,7 @@ impl<
         self.buffer.take().map(|buffer| {
             buffer[0] = ESCAPE_CHAR;
             buffer[1] = response;
-            self.uart.transmit(buffer, 2);
+            self.uart.transmit_buffer(buffer, 2);
         });
     }
 
@@ -158,13 +160,18 @@ impl<
 
 impl<
         'a,
-        U: hil::uart::UARTReceiveAdvanced + 'a,
+        U: hil::uart::UartAdvanced<'a> + 'a,
         F: hil::flash::Flash + 'a,
         G: hil::gpio::Pin + 'a,
-    > hil::uart::Client for Bootloader<'a, U, F, G>
+    > hil::uart::TransmitClient for Bootloader<'a, U, F, G>
 {
-    fn transmit_complete(&self, buffer: &'static mut [u8], error: hil::uart::Error) {
-        if error != hil::uart::Error::CommandComplete {
+    fn transmitted_buffer(
+        &self,
+        buffer: &'static mut [u8],
+        _tx_len: usize,
+        error: kernel::ReturnCode,
+    ) {
+        if error != kernel::ReturnCode::SUCCESS {
             // self.led.clear();
         } else {
             match self.state.get() {
@@ -179,25 +186,41 @@ impl<
                     // We are either done, or need to setup the next read.
                     if remaining_length == 0 {
                         self.state.set(State::Idle);
-                        self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                        self.uart
+                            .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                     } else {
                         self.buffer.replace(buffer);
                         self.page_buffer.take().map(move |page| {
                             let page_size = page.as_mut().len();
-                            self.flash.read_page(address as usize / page_size, page);
+                            let _ = self.flash.read_page(address as usize / page_size, page);
                         });
                     }
                 }
 
                 _ => {
-                    self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                    self.uart
+                        .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                 }
             }
         }
     }
+}
 
-    fn receive_complete(&self, buffer: &'static mut [u8], rx_len: usize, error: hil::uart::Error) {
-        if error != hil::uart::Error::CommandComplete {
+impl<
+        'a,
+        U: hil::uart::UartAdvanced<'a> + 'a,
+        F: hil::flash::Flash + 'a,
+        G: hil::gpio::Pin + 'a,
+    > hil::uart::ReceiveClient for Bootloader<'a, U, F, G>
+{
+    fn received_buffer(
+        &self,
+        buffer: &'static mut [u8],
+        rx_len: usize,
+        rval: kernel::ReturnCode,
+        _error: hil::uart::Error,
+    ) {
+        if rval != kernel::ReturnCode::SUCCESS {
             return;
         }
 
@@ -233,7 +256,8 @@ impl<
                     // If there are more bytes in the buffer we want to continue
                     // parsing those. Otherwise, we want to go back to receive.
                     if i == rx_len - 1 {
-                        self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                        self.uart
+                            .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                         break;
                     }
                 }
@@ -245,7 +269,7 @@ impl<
                         // at address 1024.
                         let page_index = FLAGS_ADDRESS / page.as_mut().len();
 
-                        self.flash.read_page(page_index, page);
+                        let _ = self.flash.read_page(page_index, page);
                     });
                     break;
                 }
@@ -258,7 +282,7 @@ impl<
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
                         let page_size = page.as_mut().len();
-                        self.flash.read_page(address as usize / page_size, page);
+                        let _ = self.flash.read_page(address as usize / page_size, page);
                     });
                     break;
                 }
@@ -272,7 +296,7 @@ impl<
                             buffer[1] = RES_BADARGS;
                             self.page_buffer.replace(page);
                             self.state.set(State::Idle);
-                            self.uart.transmit(buffer, 2);
+                            self.uart.transmit_buffer(buffer, 2);
                         } else {
                             // Otherwise copy into page buffer and write to
                             // flash.
@@ -281,7 +305,7 @@ impl<
                             }
                             self.state.set(State::WriteFlashPage);
                             self.buffer.replace(buffer);
-                            self.flash.write_page(address as usize / page_size, page);
+                            let _ = self.flash.write_page(address as usize / page_size, page);
                         }
                     });
                     break;
@@ -290,7 +314,7 @@ impl<
                     self.state.set(State::ErasePage);
                     self.buffer.replace(buffer);
                     let page_size = self.page_buffer.map_or(512, |page| page.as_mut().len());
-                    self.flash.erase_page(address as usize / page_size);
+                    let _ = self.flash.erase_page(address as usize / page_size);
                     break;
                 }
                 Ok(Some(tockloader_proto::Command::CrcIntFlash { address, length })) => {
@@ -302,7 +326,7 @@ impl<
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
                         let page_size = page.as_mut().len();
-                        self.flash.read_page(address as usize / page_size, page);
+                        let _ = self.flash.read_page(address as usize / page_size, page);
                     });
                     break;
                 }
@@ -317,7 +341,7 @@ impl<
                         let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
                         let page_index = read_address / page_len;
 
-                        self.flash.read_page(page_index, page);
+                        let _ = self.flash.read_page(page_index, page);
                     });
                     break;
                 }
@@ -350,7 +374,7 @@ impl<
                         let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
                         let page_index = read_address / page_len;
 
-                        self.flash.read_page(page_index, page);
+                        let _ = self.flash.read_page(page_index, page);
                     });
                     break;
                 }
@@ -383,7 +407,7 @@ impl<
 
 impl<
         'a,
-        U: hil::uart::UARTReceiveAdvanced + 'a,
+        U: hil::uart::UartAdvanced<'a> + 'a,
         F: hil::flash::Flash + 'a,
         G: hil::gpio::Pin + 'a,
     > hil::flash::Client<F> for Bootloader<'a, U, F, G>
@@ -438,7 +462,7 @@ impl<
                     }
 
                     self.page_buffer.replace(pagebuffer);
-                    self.uart.transmit(buffer, 195);
+                    self.uart.transmit_buffer(buffer, 195);
                 });
             }
 
@@ -470,7 +494,7 @@ impl<
                     }
 
                     self.page_buffer.replace(pagebuffer);
-                    self.uart.transmit(buffer, j);
+                    self.uart.transmit_buffer(buffer, j);
                 });
             }
 
@@ -488,7 +512,7 @@ impl<
                     for i in 0..64 {
                         pagebuffer.as_mut()[page_offset + i] = buffer[i];
                     }
-                    self.flash.write_page(page_index, pagebuffer);
+                    let _ = self.flash.write_page(page_index, pagebuffer);
                 });
             }
 
@@ -551,7 +575,7 @@ impl<
 
                     // And send the buffer to the client.
                     self.page_buffer.replace(pagebuffer);
-                    self.uart.transmit(buffer, index);
+                    self.uart.transmit_buffer(buffer, index);
                 });
             }
 
@@ -595,7 +619,7 @@ impl<
                         buffer[5] = ((new_crc >> 24) & 0xFF) as u8;
                         // And send the buffer to the client.
                         self.page_buffer.replace(pagebuffer);
-                        self.uart.transmit(buffer, 6);
+                        self.uart.transmit_buffer(buffer, 6);
                     });
                 } else {
                     // More CRC to do!
@@ -604,7 +628,8 @@ impl<
                         remaining_length: new_remaining_length,
                         crc: new_crc,
                     });
-                    self.flash
+                    let _ = self
+                        .flash
                         .read_page(new_address as usize / page_size, pagebuffer);
                 }
             }
@@ -623,7 +648,7 @@ impl<
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_OK;
-                    self.uart.transmit(buffer, 2);
+                    self.uart.transmit_buffer(buffer, 2);
                 });
             }
 
@@ -633,13 +658,14 @@ impl<
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_OK;
-                    self.uart.transmit(buffer, 2);
+                    self.uart.transmit_buffer(buffer, 2);
                 });
             }
 
             _ => {
                 self.buffer.take().map(|buffer| {
-                    self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                    self.uart
+                        .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                 });
             }
         }
@@ -653,13 +679,14 @@ impl<
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_OK;
-                    self.uart.transmit(buffer, 2);
+                    self.uart.transmit_buffer(buffer, 2);
                 });
             }
 
             _ => {
                 self.buffer.take().map(|buffer| {
-                    self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                    self.uart
+                        .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                 });
             }
         }
