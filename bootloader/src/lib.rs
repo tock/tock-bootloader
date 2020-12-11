@@ -8,4 +8,5 @@ extern crate kernel;
 
 pub mod bootloader;
 pub mod bootloader_crc;
+pub mod uart_receive_multiple_timeout;
 pub mod uart_receive_timeout;
