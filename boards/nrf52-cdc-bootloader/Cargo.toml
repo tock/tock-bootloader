@@ -1,0 +1,31 @@
+[package]
+name = "nrf52-cdc-bootloader"
+version = "0.1.0"
+authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
+build = "build.rs"
+edition = "2018"
+
+[dependencies]
+#cortexm4 = { git = "https://github.com/tock/tock", branch = "master" }
+#capsules = { git = "https://github.com/tock/tock", branch = "master" }
+#kernel = { git = "https://github.com/tock/tock", branch = "master" }
+#nrf52 = { git = "https://github.com/tock/tock", branch = "master" }
+#nrf52840 = { git = "https://github.com/tock/tock", branch = "master" }
+#components = { git = "https://github.com/tock/tock", branch = "master" }
+#nrf52_components = { git = "https://github.com/tock/tock", branch = "master" }
+
+cortexm4 = { path = "../../../tock/arch/cortex-m4" }
+capsules = { path = "../../../tock/capsules" }
+kernel = { path = "../../../tock/kernel" }
+nrf52 = { path = "../../../tock/chips/nrf52" }
+nrf52840 = { path = "../../../tock/chips/nrf52840" }
+components = { path = "../../../tock/boards/components" }
+nrf52_components = { path = "../../../tock/boards/nordic/nrf52_components" }
+
+bootloader = { path = "../../bootloader" }
+
+
+
+[build-dependencies]
+bootloader_attributes = { path = "../../tools/bootloader_attributes" }
+
