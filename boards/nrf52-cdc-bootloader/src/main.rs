@@ -25,8 +25,8 @@ use kernel::{create_capability, debug, debug_gpio, debug_verbose, static_init};
 use capsules::virtual_alarm::VirtualMuxAlarm;
 
 use nrf52840::gpio::Pin;
-use nrf52840::interrupt_service::Nrf52840DefaultPeripherals;
 
+use nrf52::deferred_call_tasks::DeferredCallTask;
 use nrf52_components::{self, UartChannel, UartPins};
 
 const LED_KERNEL_PIN: Pin = Pin::P0_13;
@@ -44,7 +44,7 @@ const NUM_PROCS: usize = 0;
 static mut PROCESSES: [Option<&'static dyn kernel::procs::ProcessType>; NUM_PROCS] =
     [None; NUM_PROCS];
 
-static mut CHIP: Option<&'static nrf52840::chip::NRF52<Nrf52840DefaultPeripherals>> = None;
+static mut CHIP: Option<&'static nrf52840::chip::NRF52<Nrf52840BootloaderPeripherals>> = None;
 
 /// Dummy buffer that causes the linker to reserve enough space for the stack.
 #[no_mangle]
@@ -72,21 +72,62 @@ impl kernel::Platform for Platform {
     }
 }
 
+pub struct Nrf52840BootloaderPeripherals<'a> {
+    pub pwr_clk: nrf52::power::Power<'a>,
+    pub rtc: nrf52::rtc::Rtc<'a>,
+    pub uarte0: nrf52::uart::Uarte<'a>,
+    pub nvmc: nrf52::nvmc::Nvmc,
+    pub usbd: nrf52840::usbd::Usbd<'a>,
+}
+
+impl<'a> Nrf52840BootloaderPeripherals<'a> {
+    pub fn new() -> Self {
+        Self {
+            pwr_clk: nrf52::power::Power::new(),
+            rtc: nrf52::rtc::Rtc::new(),
+            uarte0: nrf52::uart::Uarte::new(),
+            nvmc: nrf52::nvmc::Nvmc::new(),
+            usbd: nrf52::usbd::Usbd::new(),
+        }
+    }
+    // Necessary for setting up circular dependencies
+    pub fn init(&'a self) {
+        self.pwr_clk.set_usb_client(&self.usbd);
+        self.usbd.set_power_ref(&self.pwr_clk);
+    }
+}
+impl<'a> kernel::InterruptService<DeferredCallTask> for Nrf52840BootloaderPeripherals<'a> {
+    unsafe fn service_interrupt(&self, interrupt: u32) -> bool {
+        match interrupt {
+            nrf52::peripheral_interrupts::POWER_CLOCK => self.pwr_clk.handle_interrupt(),
+            nrf52::peripheral_interrupts::RTC1 => self.rtc.handle_interrupt(),
+            nrf52::peripheral_interrupts::UART0 => self.uarte0.handle_interrupt(),
+            nrf52840::peripheral_interrupts::USBD => self.usbd.handle_interrupt(),
+            _ => return false,
+        }
+        true
+    }
+    unsafe fn service_deferred_call(&self, task: DeferredCallTask) -> bool {
+        match task {
+            DeferredCallTask::Nvmc => self.nvmc.handle_interrupt(),
+        }
+        true
+    }
+}
+
 /// Entry point in the vector table called on hard reset.
 #[no_mangle]
 pub unsafe fn reset_handler() {
     // Loads relocations and clears BSS
     nrf52840::init();
-    let ppi = static_init!(nrf52840::ppi::Ppi, nrf52840::ppi::Ppi::new());
     // Initialize chip peripheral drivers
-    let nrf52840_peripherals = static_init!(
-        Nrf52840DefaultPeripherals,
-        Nrf52840DefaultPeripherals::new(ppi)
+    let peripherals = static_init!(
+        Nrf52840BootloaderPeripherals,
+        Nrf52840BootloaderPeripherals::new()
     );
 
     // set up circular peripheral dependencies
-    nrf52840_peripherals.init();
-    let base_peripherals = &nrf52840_peripherals.nrf52;
+    peripherals.init();
 
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
@@ -100,7 +141,7 @@ pub unsafe fn reset_handler() {
     let bootloader_entry_mode = static_init!(
         bootloader_nrf52::bootloader_entry_gpregret::BootloaderEntryGpRegRet,
         bootloader_nrf52::bootloader_entry_gpregret::BootloaderEntryGpRegRet::new(
-            &base_peripherals.pwr_clk
+            &peripherals.pwr_clk
         )
     );
 
@@ -121,19 +162,6 @@ pub unsafe fn reset_handler() {
     let main_loop_capability = create_capability!(capabilities::MainLoopCapability);
 
     //--------------------------------------------------------------------------
-    // DEBUG GPIO
-    //--------------------------------------------------------------------------
-
-    // Configure kernel debug GPIOs as early as possible. These are used by the
-    // `debug_gpio!(0, toggle)` macro. We configure these early so that the
-    // macro is available during most of the setup code and kernel execution.
-    kernel::debug::assign_gpios(
-        Some(&base_peripherals.gpio_port[LED_KERNEL_PIN]),
-        None,
-        None,
-    );
-
-    //--------------------------------------------------------------------------
     // Deferred Call (Dynamic) Setup
     //--------------------------------------------------------------------------
 
@@ -149,7 +177,7 @@ pub unsafe fn reset_handler() {
     // ALARM & TIMER
     //--------------------------------------------------------------------------
 
-    let rtc = &base_peripherals.rtc;
+    let rtc = &peripherals.rtc;
     rtc.start();
 
     let mux_alarm = components::alarm::AlarmMuxComponent::new(rtc)
@@ -162,7 +190,7 @@ pub unsafe fn reset_handler() {
     let channel = nrf52_components::UartChannelComponent::new(
         UartChannel::Pins(UartPins::new(UART_RTS, UART_TXD, UART_CTS, UART_RXD)),
         mux_alarm,
-        &base_peripherals.uarte0,
+        &peripherals.uarte0,
     )
     .finalize(());
 
@@ -196,7 +224,7 @@ pub unsafe fn reset_handler() {
     );
 
     let cdc = components::cdc::CdcAcmComponent::new(
-        &nrf52840_peripherals.usbd,
+        &peripherals.usbd,
         capsules::usb::cdc::MAX_CTRL_PACKET_SIZE_NRF52840,
         0x2341,
         0x005a,
@@ -245,7 +273,7 @@ pub unsafe fn reset_handler() {
         >,
         bootloader::bootloader::Bootloader::new(
             recv_auto_cdc,
-            &base_peripherals.nvmc,
+            &peripherals.nvmc,
             pagebuffer,
             &mut bootloader::bootloader::BUF
         )
@@ -253,7 +281,7 @@ pub unsafe fn reset_handler() {
     hil::uart::Transmit::set_transmit_client(cdc, bootloader);
     hil::uart::Receive::set_receive_client(cdc, recv_auto_cdc);
     hil::uart::Receive::set_receive_client(recv_auto_cdc, bootloader);
-    hil::flash::HasClient::set_client(&base_peripherals.nvmc, bootloader);
+    hil::flash::HasClient::set_client(&peripherals.nvmc, bootloader);
 
     //--------------------------------------------------------------------------
     // FINAL SETUP AND BOARD BOOT
@@ -266,15 +294,15 @@ pub unsafe fn reset_handler() {
     let platform = Platform { bootloader };
 
     let chip = static_init!(
-        nrf52840::chip::NRF52<Nrf52840DefaultPeripherals>,
-        nrf52840::chip::NRF52::new(nrf52840_peripherals)
+        nrf52840::chip::NRF52<Nrf52840BootloaderPeripherals>,
+        nrf52840::chip::NRF52::new(peripherals)
     );
     CHIP = Some(chip);
 
     // Need to disable the MPU because the bootloader seems to set it up.
     chip.mpu().clear_mpu();
 
-    debug!("Bootloader init");
+    //debug!("Bootloader init");
 
     // Configure the USB stack to enable a serial port over CDC-ACM.
     cdc.enable();
