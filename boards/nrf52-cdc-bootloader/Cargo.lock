@@ -17,6 +17,7 @@ name = "bootloader_nrf52"
 version = "0.1.0"
 dependencies = [
  "bootloader",
+ "cortexm4",
  "kernel",
  "nrf52",
 ]

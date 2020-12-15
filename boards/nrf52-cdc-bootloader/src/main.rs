@@ -91,6 +91,28 @@ pub unsafe fn reset_handler() {
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
     //--------------------------------------------------------------------------
+    // BOOTLOADER ENTRY
+    //--------------------------------------------------------------------------
+
+    // Decide very early if we want to stay in the bootloader so we don't run a
+    // bunch of init code just to reset into the kernel.
+
+    let bootloader_entry_mode = static_init!(
+        bootloader_nrf52::bootloader_entry_gpregret::BootloaderEntryGpRegRet,
+        bootloader_nrf52::bootloader_entry_gpregret::BootloaderEntryGpRegRet::new(
+            &base_peripherals.pwr_clk
+        )
+    );
+
+    let bootloader_enterer = static_init!(
+        bootloader::bootloader::BootloaderEnterer<'static>,
+        bootloader::bootloader::BootloaderEnterer::new(bootloader_entry_mode,)
+    );
+
+    // First decide if we want to actually run the bootloader or not.
+    bootloader_enterer.check();
+
+    //--------------------------------------------------------------------------
     // CAPABILITIES
     //--------------------------------------------------------------------------
 
@@ -211,11 +233,6 @@ pub unsafe fn reset_handler() {
 
     let pagebuffer = static_init!(nrf52::nvmc::NrfPage, nrf52::nvmc::NrfPage::default());
 
-    let bootloader_entry_mode = static_init!(
-        bootloader::bootloader_entry_always::BootloaderEntryAlways,
-        bootloader::bootloader_entry_always::BootloaderEntryAlways::new()
-    );
-
     // static mut PAGEBUFFER: nrf52::nvmc::NrfPage = nrf52::nvmc::NrfPage::default();
     let bootloader = static_init!(
         bootloader::bootloader::Bootloader<
@@ -229,7 +246,6 @@ pub unsafe fn reset_handler() {
         bootloader::bootloader::Bootloader::new(
             recv_auto_cdc,
             &base_peripherals.nvmc,
-            bootloader_entry_mode,
             pagebuffer,
             &mut bootloader::bootloader::BUF
         )
@@ -258,13 +274,14 @@ pub unsafe fn reset_handler() {
     // Need to disable the MPU because the bootloader seems to set it up.
     chip.mpu().clear_mpu();
 
+    debug!("Bootloader init");
+
     // Configure the USB stack to enable a serial port over CDC-ACM.
     cdc.enable();
     cdc.attach();
 
-    debug!("Initialization complete. Entering main loop.");
-
-    platform.bootloader.initialize();
+    // Actually run the bootloader.
+    platform.bootloader.start();
 
     //--------------------------------------------------------------------------
     // MAIN LOOP
