@@ -1,0 +1,10 @@
+[package]
+name = "bootloader_nrf52"
+version = "0.1.0"
+authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
+
+[dependencies]
+#kernel = { git = "https://github.com/tock/tock", branch = "master" }
+kernel = { path = "../../../tock/kernel" }
+nrf52 = { path = "../../../tock/chips/nrf52" }
+bootloader = { path = "../../bootloader" }

@@ -29,7 +29,6 @@ use nrf52840::interrupt_service::Nrf52840DefaultPeripherals;
 
 use nrf52_components::{self, UartChannel, UartPins};
 
-const BUTTON1_PIN: Pin = Pin::P0_11;
 const LED_KERNEL_PIN: Pin = Pin::P0_13;
 
 const UART_RTS: Option<Pin> = Some(Pin::P0_05);
@@ -61,7 +60,6 @@ pub struct Platform {
             VirtualMuxAlarm<'static, nrf52::rtc::Rtc<'static>>,
         >,
         nrf52::nvmc::Nvmc,
-        nrf52840::gpio::GPIOPin<'static>,
     >,
 }
 
@@ -213,6 +211,11 @@ pub unsafe fn reset_handler() {
 
     let pagebuffer = static_init!(nrf52::nvmc::NrfPage, nrf52::nvmc::NrfPage::default());
 
+    let bootloader_entry_mode = static_init!(
+        bootloader::bootloader_entry_always::BootloaderEntryAlways,
+        bootloader::bootloader_entry_always::BootloaderEntryAlways::new()
+    );
+
     // static mut PAGEBUFFER: nrf52::nvmc::NrfPage = nrf52::nvmc::NrfPage::default();
     let bootloader = static_init!(
         bootloader::bootloader::Bootloader<
@@ -222,12 +225,11 @@ pub unsafe fn reset_handler() {
                 VirtualMuxAlarm<'static, nrf52::rtc::Rtc>,
             >,
             nrf52::nvmc::Nvmc,
-            nrf52840::gpio::GPIOPin,
         >,
         bootloader::bootloader::Bootloader::new(
             recv_auto_cdc,
             &base_peripherals.nvmc,
-            &base_peripherals.gpio_port[BUTTON1_PIN],
+            bootloader_entry_mode,
             pagebuffer,
             &mut bootloader::bootloader::BUF
         )

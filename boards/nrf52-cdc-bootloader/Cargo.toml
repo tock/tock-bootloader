@@ -23,6 +23,7 @@ components = { path = "../../../tock/boards/components" }
 nrf52_components = { path = "../../../tock/boards/nordic/nrf52_components" }
 
 bootloader = { path = "../../bootloader" }
+bootloader_nrf52 = { path = "../../chips/bootloader_nrf52" }
 
 
 
