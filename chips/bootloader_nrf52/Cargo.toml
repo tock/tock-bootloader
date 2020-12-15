@@ -7,4 +7,5 @@ authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
 #kernel = { git = "https://github.com/tock/tock", branch = "master" }
 kernel = { path = "../../../tock/kernel" }
 nrf52 = { path = "../../../tock/chips/nrf52" }
+cortexm4 = { path = "../../../tock/arch/cortex-m4" }
 bootloader = { path = "../../bootloader" }
