@@ -59,10 +59,44 @@ enum State {
     },
 }
 
+/// This struct handles whether we should enter the bootloader or go straight to
+/// the kernel.
+pub struct BootloaderEnterer<'a> {
+    entry_decider: &'a dyn interfaces::BootloaderEntry,
+}
+
+impl<'a> BootloaderEnterer<'a> {
+    pub fn new(entry_decider: &'a dyn interfaces::BootloaderEntry) -> BootloaderEnterer<'a> {
+        BootloaderEnterer { entry_decider }
+    }
+
+    pub fn check(&self) {
+        if !self.entry_decider.stay_in_bootloader() {
+            // Jump to the kernel and start the real code.
+            self.jump();
+        }
+    }
+
+    fn jump(&self) {
+        unsafe {
+            asm!(
+                    ".syntax unified                        \n\
+                    ldr r0, =0x20000    // The address of the payload's .vectors                                       \n\
+                    ldr r1, =0xe000ed08 // The address of the VTOR register (0xE000E000(SCS) + 0xD00(SCB) + 0x8(VTOR)) \n\
+                    str r0, [r1]        // Move the payload's VT address into the VTOR register                        \n\
+                    ldr r1, [r0]        // Move the payload's initial SP into r1                                       \n\
+                    mov sp, r1          // Set our SP to that                                                          \n\
+                    ldr r0, [r0, #4]    // Load the payload's ENTRY into r0                                            \n\
+                    bx  r0              // Whoopee"
+                );
+        }
+    }
+}
+
+/// The main bootloader code.
 pub struct Bootloader<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'static> {
     uart: &'a U,
     flash: &'a F,
-    entry_decider: &'a dyn interfaces::BootloaderEntry,
     page_buffer: TakeCell<'static, F::Page>,
     buffer: TakeCell<'static, [u8]>,
     state: Cell<State>,
@@ -72,41 +106,32 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloa
     pub fn new(
         uart: &'a U,
         flash: &'a F,
-        entry_decider: &'a dyn interfaces::BootloaderEntry,
         page_buffer: &'static mut F::Page,
         buffer: &'static mut [u8],
     ) -> Bootloader<'a, U, F> {
         Bootloader {
             uart: uart,
             flash: flash,
-            entry_decider: entry_decider,
             page_buffer: TakeCell::new(page_buffer),
             buffer: TakeCell::new(buffer),
             state: Cell::new(State::Idle),
         }
     }
 
-    pub fn initialize(&self) {
-        if self.entry_decider.stay_in_bootloader() {
-            // Looks like we do want bootloader mode.
+    pub fn start(&self) {
+        // Setup UART and start listening.
+        self.uart.configure(hil::uart::Parameters {
+            baud_rate: 115200,
+            width: hil::uart::Width::Eight,
+            stop_bits: hil::uart::StopBits::One,
+            parity: hil::uart::Parity::None,
+            hw_flow_control: false,
+        });
 
-            // Setup UART and start listening.
-            self.uart.configure(hil::uart::Parameters {
-                baud_rate: 115200,
-                width: hil::uart::Width::Eight,
-                stop_bits: hil::uart::StopBits::One,
-                parity: hil::uart::Parity::None,
-                hw_flow_control: false,
-            });
-
-            self.buffer.take().map(|buffer| {
-                self.uart
-                    .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
-            });
-        } else {
-            // Jump to the kernel and start the real code.
-            self.jump();
-        }
+        self.buffer.take().map(|buffer| {
+            self.uart
+                .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
+        });
     }
 
     // Helper function for sending single byte responses.
@@ -116,21 +141,6 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloa
             buffer[1] = response;
             self.uart.transmit_buffer(buffer, 2);
         });
-    }
-
-    fn jump(&self) {
-        unsafe {
-            asm!(
-                    ".syntax unified                        \n\
-                    ldr r0, =0x10000    // The address of the payload's .vectors                                       \n\
-                    ldr r1, =0xe000ed08 // The address of the VTOR register (0xE000E000(SCS) + 0xD00(SCB) + 0x8(VTOR)) \n\
-                    str r0, [r1]        // Move the payload's VT address into the VTOR register                        \n\
-                    ldr r1, [r0]        // Move the payload's initial SP into r1                                       \n\
-                    mov sp, r1          // Set our SP to that                                                          \n\
-                    ldr r0, [r0, #4]    // Load the payload's ENTRY into r0                                            \n\
-                    bx  r0              // Whoopee"
-                );
-        }
     }
 }
 
