@@ -7,6 +7,7 @@ use kernel::common::cells::TakeCell;
 use kernel::hil;
 
 use bootloader_crc;
+use interfaces;
 
 extern crate tockloader_proto;
 
@@ -58,38 +59,27 @@ enum State {
     },
 }
 
-pub struct Bootloader<
-    'a,
-    U: hil::uart::UartAdvanced<'a> + 'a,
-    F: hil::flash::Flash + 'static,
-    G: hil::gpio::Pin + 'a,
-> {
+pub struct Bootloader<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'static> {
     uart: &'a U,
     flash: &'a F,
-    select_pin: &'a G,
+    entry_decider: &'a dyn interfaces::BootloaderEntry,
     page_buffer: TakeCell<'static, F::Page>,
     buffer: TakeCell<'static, [u8]>,
     state: Cell<State>,
 }
 
-impl<
-        'a,
-        U: hil::uart::UartAdvanced<'a> + 'a,
-        F: hil::flash::Flash + 'a,
-        G: hil::gpio::Pin + 'a,
-    > Bootloader<'a, U, F, G>
-{
+impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloader<'a, U, F> {
     pub fn new(
         uart: &'a U,
         flash: &'a F,
-        select_pin: &'a G,
+        entry_decider: &'a dyn interfaces::BootloaderEntry,
         page_buffer: &'static mut F::Page,
         buffer: &'static mut [u8],
-    ) -> Bootloader<'a, U, F, G> {
+    ) -> Bootloader<'a, U, F> {
         Bootloader {
             uart: uart,
             flash: flash,
-            select_pin: select_pin,
+            entry_decider: entry_decider,
             page_buffer: TakeCell::new(page_buffer),
             buffer: TakeCell::new(buffer),
             state: Cell::new(State::Idle),
@@ -97,32 +87,18 @@ impl<
     }
 
     pub fn initialize(&self) {
-        // Setup UART and start listening.
-        self.uart.configure(hil::uart::Parameters {
-            baud_rate: 115200,
-            width: hil::uart::Width::Eight,
-            stop_bits: hil::uart::StopBits::One,
-            parity: hil::uart::Parity::None,
-            hw_flow_control: false,
-        });
-
-        self.select_pin.make_input();
-
-        // Check the select pin to see if we should enter bootloader mode.
-        let mut samples = 10000;
-        let mut active = 0;
-        let mut inactive = 0;
-        while samples > 0 {
-            if self.select_pin.read() == false {
-                active += 1;
-            } else {
-                inactive += 1;
-            }
-            samples -= 1;
-        }
-
-        if active > inactive {
+        if self.entry_decider.stay_in_bootloader() {
             // Looks like we do want bootloader mode.
+
+            // Setup UART and start listening.
+            self.uart.configure(hil::uart::Parameters {
+                baud_rate: 115200,
+                width: hil::uart::Width::Eight,
+                stop_bits: hil::uart::StopBits::One,
+                parity: hil::uart::Parity::None,
+                hw_flow_control: false,
+            });
+
             self.buffer.take().map(|buffer| {
                 self.uart
                     .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
@@ -158,12 +134,8 @@ impl<
     }
 }
 
-impl<
-        'a,
-        U: hil::uart::UartAdvanced<'a> + 'a,
-        F: hil::flash::Flash + 'a,
-        G: hil::gpio::Pin + 'a,
-    > hil::uart::TransmitClient for Bootloader<'a, U, F, G>
+impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::uart::TransmitClient
+    for Bootloader<'a, U, F>
 {
     fn transmitted_buffer(
         &self,
@@ -206,12 +178,8 @@ impl<
     }
 }
 
-impl<
-        'a,
-        U: hil::uart::UartAdvanced<'a> + 'a,
-        F: hil::flash::Flash + 'a,
-        G: hil::gpio::Pin + 'a,
-    > hil::uart::ReceiveClient for Bootloader<'a, U, F, G>
+impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::uart::ReceiveClient
+    for Bootloader<'a, U, F>
 {
     fn received_buffer(
         &self,
@@ -405,12 +373,8 @@ impl<
     }
 }
 
-impl<
-        'a,
-        U: hil::uart::UartAdvanced<'a> + 'a,
-        F: hil::flash::Flash + 'a,
-        G: hil::gpio::Pin + 'a,
-    > hil::flash::Client<F> for Bootloader<'a, U, F, G>
+impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::flash::Client<F>
+    for Bootloader<'a, U, F>
 {
     fn read_complete(&self, pagebuffer: &'static mut F::Page, _error: hil::flash::Error) {
         match self.state.get() {
