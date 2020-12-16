@@ -44,6 +44,9 @@ impl bootloader::interfaces::BootloaderEntry for BootloaderEntryGpRegRet {
         // before doing a reset to indicate we should reboot into the
         // bootloader.
         if self.nrf_power.get_gpregret() == DFU_MAGIC_SERIAL_ONLY_RESET {
+            // Clear flag so we do not get stuck in the bootloader.
+            self.nrf_power.set_gpregret(0);
+
             return true;
         }
 
