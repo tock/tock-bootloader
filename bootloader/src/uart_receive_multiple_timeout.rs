@@ -180,7 +180,8 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveMultip
             State::Receiving => {
                 // We got the first payload from the underlying receive channel.
 
-                // First we always copy what we just received into the client's buffer.
+                // First we always copy what we just received into the client's
+                // buffer.
                 self.rx_client_buffer.map(|client_rx| {
                     let rx_offset = self.rx_client_index.get();
 
@@ -197,15 +198,16 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveMultip
 
                 // If everything is normal then we continue receiving.
                 if rval == ReturnCode::SUCCESS {
-                    // Next we setup a timer to timeout if the receive has finished.
-                    let interval = A::ticks_from_ms(80);
+                    // Next we setup a timer to timeout if the receive has
+                    // finished.
+                    let interval = A::ticks_from_ms(4);
                     self.alarm.set_alarm(self.alarm.now(), interval);
 
                     // Then we go back to receiving to see if there is more data
                     // on its way.
                     //
-                    // Receive up to half of the buffer at a time so there is room
-                    // if the host sends us more than we expect.
+                    // Receive up to half of the buffer at a time so there is
+                    // room if the host sends us more than we expect.
                     self.uart.receive_buffer(buffer, buffer.len() / 2);
                 } else if rval == ReturnCode::ECANCEL {
                     // The last receive was aborted meaning the receive has

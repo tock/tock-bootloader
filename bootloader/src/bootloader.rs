@@ -12,8 +12,8 @@ use interfaces;
 extern crate tockloader_proto;
 
 // Main buffer that commands are received into and sent from.
-// Need a buffer big enough for 4096 byte pages on the nRF52.
-pub static mut BUF: [u8; 4224] = [0; 4224];
+// Need a buffer big enough for 512 byte pages.
+pub static mut BUF: [u8; 600] = [0; 600];
 
 // How long to wait, in bit periods, after receiving a byte for the next
 // byte before timing out and calling `receive_complete`.
