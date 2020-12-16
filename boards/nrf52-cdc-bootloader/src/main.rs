@@ -45,14 +45,14 @@ static mut PROCESSES: [Option<&'static dyn kernel::procs::ProcessType>; NUM_PROC
     [None; NUM_PROCS];
 
 static mut CHIP: Option<&'static nrf52840::chip::NRF52<Nrf52840DefaultPeripherals>> = None;
-static mut NRF52_POWER: Option<&'static nrf52::power::Power> = None;
 
 /// Dummy buffer that causes the linker to reserve enough space for the stack.
 #[no_mangle]
 #[link_section = ".stack_buffer"]
 pub static mut STACK_MEMORY: [u8; 0x2000] = [0; 0x2000];
 
-fn baud_rate_reset_bootloader_exit() {
+/// Function to allow the bootloader to exit by reseting the chip.
+fn bootloader_exit() {
     unsafe {
         cortexm4::scb::reset();
     }
@@ -94,8 +94,6 @@ pub unsafe fn reset_handler() {
     // set up circular peripheral dependencies
     nrf52840_peripherals.init();
     let base_peripherals = &nrf52840_peripherals.nrf52;
-
-    NRF52_POWER = Some(&base_peripherals.pwr_clk);
 
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
@@ -212,7 +210,7 @@ pub unsafe fn reset_handler() {
         strings,
         mux_alarm,
         dynamic_deferred_caller,
-        Some(&baud_rate_reset_bootloader_exit),
+        None,
     )
     .finalize(components::usb_cdc_acm_component_helper!(
         nrf52::usbd::Usbd,
@@ -257,7 +255,6 @@ pub unsafe fn reset_handler() {
         bootloader::flash_large_to_small::FiveTwelvePage::default()
     );
 
-    // static mut PAGEBUFFER: nrf52::nvmc::NrfPage = nrf52::nvmc::NrfPage::default();
     let bootloader = static_init!(
         bootloader::bootloader::Bootloader<
             'static,
@@ -270,7 +267,7 @@ pub unsafe fn reset_handler() {
         bootloader::bootloader::Bootloader::new(
             recv_auto_cdc,
             flash_adapter,
-            &baud_rate_reset_bootloader_exit,
+            &bootloader_exit,
             pagebuffer,
             &mut bootloader::bootloader::BUF
         )
