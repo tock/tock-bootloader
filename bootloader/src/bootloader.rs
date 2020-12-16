@@ -9,8 +9,6 @@ use kernel::hil;
 use bootloader_crc;
 use interfaces;
 
-extern crate tockloader_proto;
-
 // Main buffer that commands are received into and sent from.
 // Need a buffer big enough for 512 byte pages.
 pub static mut BUF: [u8; 600] = [0; 600];
@@ -97,6 +95,7 @@ impl<'a> BootloaderEnterer<'a> {
 pub struct Bootloader<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'static> {
     uart: &'a U,
     flash: &'a F,
+    reset_function: &'a (dyn Fn() + 'a),
     page_buffer: TakeCell<'static, F::Page>,
     buffer: TakeCell<'static, [u8]>,
     state: Cell<State>,
@@ -106,12 +105,14 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloa
     pub fn new(
         uart: &'a U,
         flash: &'a F,
+        reset_function: &'a (dyn Fn() + 'a),
         page_buffer: &'static mut F::Page,
         buffer: &'static mut [u8],
     ) -> Bootloader<'a, U, F> {
         Bootloader {
             uart: uart,
             flash: flash,
+            reset_function: reset_function,
             page_buffer: TakeCell::new(page_buffer),
             buffer: TakeCell::new(buffer),
             state: Cell::new(State::Idle),
@@ -205,7 +206,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
         // Tool to parse incoming bootloader messages.
         // This is currently allocated on the stack, but it too needs a big
         // buffer, and we need to do something about that.
-        let mut decoder = tockloader_proto::CommandDecoder::new();
+        let mut decoder = tock_bootloader_protocol::CommandDecoder::new();
         // Whether we want to reset the position in the buffer in the
         // decoder.
         let mut need_reset = false;
@@ -224,12 +225,12 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
 
             match decoder.receive(buffer[i]) {
                 Ok(None) => {}
-                Ok(Some(tockloader_proto::Command::Ping)) => {
+                Ok(Some(tock_bootloader_protocol::Command::Ping)) => {
                     self.buffer.replace(buffer);
                     self.send_response(RES_PONG);
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::Reset)) => {
+                Ok(Some(tock_bootloader_protocol::Command::Reset)) => {
                     need_reset = true;
                     // If there are more bytes in the buffer we want to continue
                     // parsing those. Otherwise, we want to go back to receive.
@@ -239,7 +240,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                         break;
                     }
                 }
-                Ok(Some(tockloader_proto::Command::Info)) => {
+                Ok(Some(tock_bootloader_protocol::Command::Info)) => {
                     self.state.set(State::Info);
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
@@ -251,7 +252,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::ReadRange { address, length })) => {
+                Ok(Some(tock_bootloader_protocol::Command::ReadRange { address, length })) => {
                     self.state.set(State::ReadRange {
                         address,
                         length,
@@ -264,7 +265,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::WritePage { address, data })) => {
+                Ok(Some(tock_bootloader_protocol::Command::WritePage { address, data })) => {
                     self.page_buffer.take().map(move |page| {
                         let page_size = page.as_mut().len();
                         if page_size != data.len() {
@@ -288,14 +289,14 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::ErasePage { address })) => {
+                Ok(Some(tock_bootloader_protocol::Command::ErasePage { address })) => {
                     self.state.set(State::ErasePage);
                     self.buffer.replace(buffer);
                     let page_size = self.page_buffer.map_or(512, |page| page.as_mut().len());
                     let _ = self.flash.erase_page(address as usize / page_size);
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::CrcIntFlash { address, length })) => {
+                Ok(Some(tock_bootloader_protocol::Command::CrcIntFlash { address, length })) => {
                     self.state.set(State::Crc {
                         address,
                         remaining_length: length,
@@ -308,7 +309,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::GetAttr { index })) => {
+                Ok(Some(tock_bootloader_protocol::Command::GetAttr { index })) => {
                     self.state.set(State::GetAttribute { index: index });
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
@@ -323,7 +324,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::SetAttr { index, key, value })) => {
+                Ok(Some(tock_bootloader_protocol::Command::SetAttr { index, key, value })) => {
                     self.state.set(State::SetAttribute { index });
 
                     // Copy the key and value into the buffer so it can be added
@@ -356,12 +357,16 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                     });
                     break;
                 }
+                Ok(Some(tock_bootloader_protocol::Command::Exit)) => {
+                    (self.reset_function)();
+                    break;
+                }
                 Ok(Some(_)) => {
                     self.buffer.replace(buffer);
                     self.send_response(RES_UNKNOWN);
                     break;
                 }
-                Err(tockloader_proto::Error::BadArguments) => {
+                Err(tock_bootloader_protocol::Error::BadArguments) => {
                     self.buffer.replace(buffer);
                     self.send_response(RES_BADARGS);
                     break;

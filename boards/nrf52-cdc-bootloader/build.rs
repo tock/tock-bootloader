@@ -9,4 +9,5 @@ fn main() {
     bootloader_attributes::write_attribute(&mut f, "board", "nrf52dk");
     bootloader_attributes::write_attribute(&mut f, "arch", "cortex-m4");
     bootloader_attributes::write_attribute(&mut f, "jldevice", "nrf52");
+    bootloader_attributes::write_attribute(&mut f, "appaddr", "0x50000");
 }
