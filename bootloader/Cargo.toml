@@ -6,4 +6,4 @@ authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
 [dependencies]
 #kernel = { git = "https://github.com/tock/tock", branch = "master" }
 kernel = { path = "../../tock/kernel" }
-tockloader-proto = { git = "https://github.com/tock/tockloader-proto-rs" }
+tock-bootloader-protocol = { path = "../protocol" }

@@ -1,0 +1,10 @@
+[package]
+name = "tock-bootloader-protocol"
+version = "0.2.2"
+authors = ["Jonathan 'theJPster' Pallant <github@thejpster.org.uk>"]
+description = "A #[no_std] implementation of the protocol used by tockloader and the TockOS bootloader."
+license = "MIT/Apache-2.0"
+repository = "https://github.com/tock/tock-bootloader"
+
+[dependencies]
+byteorder = { version = "1", default-features = false }
