@@ -342,6 +342,23 @@ Set a new baud rate for the bootloader.
 - `Message`: `None`.
 
 
+#### `EXIT`
+
+Exit the bootloader.
+
+##### Command
+- `Command`: `0x22`.
+- `Message`: `None`.
+
+##### Response
+None.
+
+
+Changelog
+--------------------
+
+- Version 1.0.2: Added Exit command.
+
 
 
 Future Goals
