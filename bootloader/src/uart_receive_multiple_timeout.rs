@@ -148,16 +148,6 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::UartAdvanced<'a>
     for UartReceiveMultipleTimeout<'a, A>
 {}
 
-impl<'a, A: hil::time::Alarm<'a>> hil::gpio::Client for UartReceiveMultipleTimeout<'a, A> {
-    // This is called when the UART RX pin toggles.
-    // We start a new timer on every toggle to wait for the end of incoming
-    // RX bytes.
-    fn fired(&self) {
-        let interval = A::ticks_from_ms(30);
-        self.alarm.set_alarm(self.alarm.now(), interval);
-    }
-}
-
 impl<'a, A: hil::time::Alarm<'a>> hil::time::AlarmClient for UartReceiveMultipleTimeout<'a, A> {
     /// If the timer actually fires then we stopped receiving bytes.
     fn alarm(&self) {
@@ -208,12 +198,15 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveMultip
                 // If everything is normal then we continue receiving.
                 if rval == ReturnCode::SUCCESS {
                     // Next we setup a timer to timeout if the receive has finished.
-                    let interval = A::ticks_from_ms(100);
+                    let interval = A::ticks_from_ms(80);
                     self.alarm.set_alarm(self.alarm.now(), interval);
 
                     // Then we go back to receiving to see if there is more data
                     // on its way.
-                    self.uart.receive_buffer(buffer, buffer.len());
+                    //
+                    // Receive up to half of the buffer at a time so there is room
+                    // if the host sends us more than we expect.
+                    self.uart.receive_buffer(buffer, buffer.len() / 2);
                 } else if rval == ReturnCode::ECANCEL {
                     // The last receive was aborted meaning the receive has
                     // finished.

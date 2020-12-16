@@ -59,7 +59,7 @@ pub struct Platform {
             'static,
             VirtualMuxAlarm<'static, nrf52::rtc::Rtc<'static>>,
         >,
-        nrf52::nvmc::Nvmc,
+        bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52::nvmc::Nvmc>,
     >,
 }
 
@@ -106,7 +106,7 @@ pub unsafe fn reset_handler() {
 
     let bootloader_enterer = static_init!(
         bootloader::bootloader::BootloaderEnterer<'static>,
-        bootloader::bootloader::BootloaderEnterer::new(bootloader_entry_mode,)
+        bootloader::bootloader::BootloaderEnterer::new(bootloader_entry_mode)
     );
 
     // First decide if we want to actually run the bootloader or not.
@@ -231,7 +231,21 @@ pub unsafe fn reset_handler() {
     );
     recv_auto_virtual_alarm.set_alarm_client(recv_auto_cdc);
 
-    let pagebuffer = static_init!(nrf52::nvmc::NrfPage, nrf52::nvmc::NrfPage::default());
+    let nrfpagebuffer = static_init!(nrf52::nvmc::NrfPage, nrf52::nvmc::NrfPage::default());
+
+    let flash_adapter = static_init!(
+        bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52::nvmc::Nvmc>,
+        bootloader::flash_large_to_small::FlashLargeToSmall::new(
+            &base_peripherals.nvmc,
+            nrfpagebuffer,
+        )
+    );
+    hil::flash::HasClient::set_client(&base_peripherals.nvmc, flash_adapter);
+
+    let pagebuffer = static_init!(
+        bootloader::flash_large_to_small::FiveTwelvePage,
+        bootloader::flash_large_to_small::FiveTwelvePage::default()
+    );
 
     // static mut PAGEBUFFER: nrf52::nvmc::NrfPage = nrf52::nvmc::NrfPage::default();
     let bootloader = static_init!(
@@ -241,11 +255,11 @@ pub unsafe fn reset_handler() {
                 'static,
                 VirtualMuxAlarm<'static, nrf52::rtc::Rtc>,
             >,
-            nrf52::nvmc::Nvmc,
+            bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52::nvmc::Nvmc>,
         >,
         bootloader::bootloader::Bootloader::new(
             recv_auto_cdc,
-            &base_peripherals.nvmc,
+            flash_adapter,
             pagebuffer,
             &mut bootloader::bootloader::BUF
         )
@@ -253,7 +267,7 @@ pub unsafe fn reset_handler() {
     hil::uart::Transmit::set_transmit_client(cdc, bootloader);
     hil::uart::Receive::set_receive_client(cdc, recv_auto_cdc);
     hil::uart::Receive::set_receive_client(recv_auto_cdc, bootloader);
-    hil::flash::HasClient::set_client(&base_peripherals.nvmc, bootloader);
+    hil::flash::HasClient::set_client(flash_adapter, bootloader);
 
     //--------------------------------------------------------------------------
     // FINAL SETUP AND BOARD BOOT
