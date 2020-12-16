@@ -81,7 +81,7 @@ impl<'a> BootloaderEnterer<'a> {
         unsafe {
             asm!(
                     ".syntax unified                        \n\
-                    ldr r0, =0x20000    // The address of the payload's .vectors                                       \n\
+                    ldr r0, =0x10000    // The address of the payload's .vectors                                       \n\
                     ldr r1, =0xe000ed08 // The address of the VTOR register (0xE000E000(SCS) + 0xD00(SCB) + 0x8(VTOR)) \n\
                     str r0, [r1]        // Move the payload's VT address into the VTOR register                        \n\
                     ldr r1, [r0]        // Move the payload's initial SP into r1                                       \n\
