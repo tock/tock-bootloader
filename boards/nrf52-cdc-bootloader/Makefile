@@ -5,7 +5,7 @@ TOCK_ARCH=cortex-m4
 TARGET=thumbv7em-none-eabi
 PLATFORM=nrf52-cdc-bootloader
 
-include Common.mk
+include ../Common.mk
 
 TOCKLOADER=tockloader
 
