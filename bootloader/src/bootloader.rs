@@ -46,6 +46,9 @@ enum State {
     SetAttribute {
         index: u8,
     },
+    SetStartAddress {
+        address: u32,
+    },
     WriteFlashPage,
     ReadRange {
         address: u32,
@@ -368,6 +371,20 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                     });
                     break;
                 }
+                Ok(Some(tock_bootloader_protocol::Command::SetStartAddress { address })) => {
+                    self.state.set(State::SetStartAddress { address });
+                    self.buffer.replace(buffer);
+
+                    // Initiate things by reading the correct flash page that
+                    // needs to be updated.
+                    self.page_buffer.take().map(move |page| {
+                        let page_len = page.as_mut().len();
+                        let page_index = FLAGS_ADDRESS / page_len;
+
+                        let _ = self.flash.read_page(page_index, page);
+                    });
+                    break;
+                }
                 Ok(Some(tock_bootloader_protocol::Command::Exit)) => {
                     (self.reset_function)();
                     break;
@@ -504,6 +521,22 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::fl
                     }
                     let _ = self.flash.write_page(page_index, pagebuffer);
                 });
+            }
+
+            // We need to update the page we just read with the new attribute,
+            // and then write that all back to flash.
+            State::SetStartAddress { address } => {
+                let page_len = pagebuffer.as_mut().len();
+                let read_address = FLAGS_ADDRESS + 32;
+                let page_offset = read_address % page_len;
+                let page_index = read_address / page_len;
+
+                // Copy the first 64 bytes of the buffer into the correct
+                // spot in the page.
+                for (i, v) in address.to_le_bytes().iter().enumerate() {
+                    pagebuffer.as_mut()[page_offset + i] = *v;
+                }
+                let _ = self.flash.write_page(page_index, pagebuffer);
             }
 
             // Pass what we have read so far to the client.
@@ -644,6 +677,16 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::fl
 
             // Attribute writing done, send an OK response.
             State::SetAttribute { index: _ } => {
+                self.state.set(State::Idle);
+                self.buffer.take().map(move |buffer| {
+                    buffer[0] = ESCAPE_CHAR;
+                    buffer[1] = RES_OK;
+                    self.uart.transmit_buffer(buffer, 2);
+                });
+            }
+
+            // Attribute writing done, send an OK response.
+            State::SetStartAddress { address: _ } => {
                 self.state.set(State::Idle);
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;

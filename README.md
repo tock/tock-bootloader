@@ -413,7 +413,9 @@ Attribute format:
 Changelog
 --------------------
 
-- Version 1.0.2: Added Exit command.
+- Version 1.0.2
+  - Added Exit command.
+  - Added SetStartAddress command.
 
 
 

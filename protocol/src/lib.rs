@@ -80,6 +80,8 @@ pub enum Command<'a> {
         key: &'a [u8],
         value: &'a [u8],
     },
+    /// Configure the address the bootloader jumps to run the kernel.
+    SetStartAddress { address: u32 },
     /// Get a payload attribute. The RX buffer should contain a 1 byte index.
     /// The result is 8 bytes of key, 1 byte of value length, and 55 bytes of
     /// potential value. You must discard 55-valuelength bytes from the end
@@ -237,6 +239,7 @@ const CMD_CLKOUT: u8 = 0x19;
 const CMD_WUSER: u8 = 0x20;
 const CMD_CHANGE_BAUD: u8 = 0x21;
 const CMD_EXIT: u8 = 0x22;
+const CMD_SSTARTADDR: u8 = 0x23;
 
 const RES_OVERFLOW: u8 = 0x10;
 const RES_PONG: u8 = 0x11;
@@ -511,6 +514,22 @@ impl CommandDecoder {
                             baud,
                         })),
                         _ => Err(Error::BadArguments),
+                    }
+                } else {
+                    Err(Error::BadArguments)
+                }
+            }
+            CMD_SSTARTADDR => {
+                let num_expected_bytes: usize = 4;
+                if self.count >= num_expected_bytes {
+                    let address = (self.buffer[0] as u32)
+                        | ((self.buffer[1] as u32) << 8)
+                        | ((self.buffer[2] as u32) << 16)
+                        | ((self.buffer[3] as u32) << 24);
+                    if self.count == num_expected_bytes {
+                        Ok(Some(Command::SetStartAddress { address }))
+                    } else {
+                        Err(Error::BadArguments)
                     }
                 } else {
                     Err(Error::BadArguments)
@@ -936,6 +955,14 @@ impl<'a> CommandEncoder<'a> {
         }
     }
 
+    fn render_setstartaddress(&mut self, address: u32) -> (usize, Option<u8>) {
+        let count = self.count;
+        match count {
+            0..=3 => self.render_u32(count, address),
+            _ => self.render_basic_cmd(count - 4, CMD_SSTARTADDR),
+        }
+    }
+
     fn render_crcintflash(&mut self, address: u32, length: u32) -> (usize, Option<u8>) {
         let count = self.count;
         match count {
@@ -1014,6 +1041,7 @@ impl<'a> Iterator for CommandEncoder<'a> {
                 self.render_writeflashuserpages(page1, page2)
             }
             &Command::ChangeBaud { mode, baud } => self.render_changebaud(mode, baud),
+            &Command::SetStartAddress { address } => self.render_setstartaddress(address),
             &Command::Exit => self.render_basic_cmd(count, CMD_EXIT),
         };
         self.count = self.count + inc;
@@ -2356,7 +2384,6 @@ mod tests {
             Err(e) => panic!("Did not expect: {:?}", e),
         }
     }
-
 }
 
 // ****************************************************************************
