@@ -4,6 +4,8 @@ use core::cell::Cell;
 use core::cmp;
 
 use kernel::common::cells::TakeCell;
+use kernel::common::cells::VolatileCell;
+use kernel::common::StaticRef;
 use kernel::hil;
 
 use bootloader_crc;
@@ -61,11 +63,23 @@ enum State {
 /// the kernel.
 pub struct BootloaderEnterer<'a> {
     entry_decider: &'a dyn interfaces::BootloaderEntry,
+    jumper: &'a dyn interfaces::Jumper,
+    /// This is the address of flash where the flags region of the bootloader
+    /// start. We need this to determine what address to jump to.
+    bootloader_flags_address: u32,
 }
 
 impl<'a> BootloaderEnterer<'a> {
-    pub fn new(entry_decider: &'a dyn interfaces::BootloaderEntry) -> BootloaderEnterer<'a> {
-        BootloaderEnterer { entry_decider }
+    pub fn new(
+        entry_decider: &'a dyn interfaces::BootloaderEntry,
+        jumper: &'a dyn interfaces::Jumper,
+        bootloader_flags_address: u32,
+    ) -> BootloaderEnterer<'a> {
+        BootloaderEnterer {
+            entry_decider,
+            jumper,
+            bootloader_flags_address,
+        }
     }
 
     pub fn check(&self) {
@@ -76,18 +90,15 @@ impl<'a> BootloaderEnterer<'a> {
     }
 
     fn jump(&self) {
-        unsafe {
-            asm!(
-                    ".syntax unified                        \n\
-                    ldr r0, =0x10000    // The address of the payload's .vectors                                       \n\
-                    ldr r1, =0xe000ed08 // The address of the VTOR register (0xE000E000(SCS) + 0xD00(SCB) + 0x8(VTOR)) \n\
-                    str r0, [r1]        // Move the payload's VT address into the VTOR register                        \n\
-                    ldr r1, [r0]        // Move the payload's initial SP into r1                                       \n\
-                    mov sp, r1          // Set our SP to that                                                          \n\
-                    ldr r0, [r0, #4]    // Load the payload's ENTRY into r0                                            \n\
-                    bx  r0              // Whoopee"
-                );
-        }
+        // Address of the start address in the flags region is 32 bytes from the start.
+        let start_address_memory_location = self.bootloader_flags_address + 32;
+
+        let start_address_ptr: StaticRef<VolatileCell<u32>> =
+            unsafe { StaticRef::new(start_address_memory_location as *const VolatileCell<u32>) };
+
+        let start_address = start_address_ptr.get();
+
+        self.jumper.jump(start_address);
     }
 }
 

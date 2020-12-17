@@ -13,6 +13,14 @@ name = "bootloader_attributes"
 version = "0.1.0"
 
 [[package]]
+name = "bootloader_cortexm"
+version = "0.1.0"
+dependencies = [
+ "bootloader",
+ "kernel",
+]
+
+[[package]]
 name = "bootloader_nrf52"
 version = "0.1.0"
 dependencies = [
@@ -88,6 +96,7 @@ version = "0.1.0"
 dependencies = [
  "bootloader",
  "bootloader_attributes",
+ "bootloader_cortexm",
  "bootloader_nrf52",
  "capsules",
  "components",

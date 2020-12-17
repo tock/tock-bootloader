@@ -354,6 +354,62 @@ Exit the bootloader.
 None.
 
 
+
+Flags and Attributes
+--------------------
+
+The bootloader includes space near the beginning of the bootloader's space in flash for
+flags and attributes. Attributes are key-value pairs used to store various properties of
+the board. Flags are specified values for use by the bootloader.
+
+### Flags
+
+The flag section is 512 bytes long. Most of the section is reserved for future
+use.
+
+```
+ Bytes
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|T|O|C|K|B|O|O|T|L|O|A|D|E|R| Version Str   |  Reserved         |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Start | Reserved...
++-+-+-+-+-+-+-+-+-+-+-+-+
+```
+
+- `TOCKBOOTLOADER`: The first fourteen bytes contain the string
+  "TOCKBOOTLOADER".
+- `Version Str`: The next 8 bytes contain an ASCII string of the bootloader
+  version.
+- `Start`: Four bytes of the start address to jump to if the bootloader is not
+  entered.
+
+### Attributes
+
+The attributes section occupies the next 1024 bytes. Each attribute uses 64
+bytes of space. There can be up to 16 attributes.
+
+Attribute format:
+
+```
+ Bytes
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Key         | Value
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                                                                |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+```
+
+- `Key`: The key can be up to 8 bytes long. Keys are `\0` padded to consume all
+  8 bytes.
+- `Value`: Values can be up to 56 bytes long.
+
+
+
+
 Changelog
 --------------------
 

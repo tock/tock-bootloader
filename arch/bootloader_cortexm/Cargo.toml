@@ -1,0 +1,9 @@
+[package]
+name = "bootloader_cortexm"
+version = "0.1.0"
+authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
+
+[dependencies]
+#kernel = { git = "https://github.com/tock/tock", branch = "master" }
+kernel = { path = "../../../tock/kernel" }
+bootloader = { path = "../../bootloader" }

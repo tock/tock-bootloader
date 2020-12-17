@@ -10,3 +10,10 @@ pub trait BootloaderEntry {
     /// to application code.
     fn stay_in_bootloader(&self) -> bool;
 }
+
+/// Trait for handling the jump from the bootloader to the kernel.
+pub trait Jumper {
+    /// Jump execution to the specified address as though the chip had started
+    /// executing there.
+    fn jump(&self, address: u32) -> !;
+}
