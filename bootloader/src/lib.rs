@@ -1,4 +1,4 @@
-#![feature(const_fn, asm)]
+#![feature(const_fn, asm, assoc_char_funcs)]
 // #![forbid(unsafe_code)]
 #![no_std]
 

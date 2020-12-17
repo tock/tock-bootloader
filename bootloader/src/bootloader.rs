@@ -451,8 +451,27 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::fl
                         index += 1;
                     }
 
+                    // Do start address
+                    let str02 = "\", \"start_address\":\"0x";
+                    for i in 0..str02.len() {
+                        buffer[index] = str02.as_bytes()[i];
+                        index += 1;
+                    }
+                    for i in 0..8 {
+                        let b = (pagebuffer.as_mut()[32 + page_offset + 3 - (i / 2)]
+                            >> (((i + 1) % 2) * 4))
+                            & 0x0F;
+                        buffer[index] = char::from_digit(b.into(), 16).unwrap_or('?') as u8;
+                        index += 1;
+                    }
+                    let str02 = "\", ";
+                    for i in 0..str02.len() {
+                        buffer[index] = str02.as_bytes()[i];
+                        index += 1;
+                    }
+
                     // Insert the last half of the JSON blob into the buffer.
-                    let str02 = "\", \"name\":\"Tock Bootloader\"}";
+                    let str02 = "\"name\":\"Tock Bootloader\"}";
                     for i in 0..str02.len() {
                         buffer[index] = str02.as_bytes()[i];
                         index += 1;
