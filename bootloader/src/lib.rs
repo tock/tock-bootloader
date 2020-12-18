@@ -1,4 +1,5 @@
 #![feature(const_fn, asm, assoc_char_funcs)]
+#![feature(const_raw_ptr_to_usize_cast)]
 // #![forbid(unsafe_code)]
 #![no_std]
 

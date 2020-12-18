@@ -19,8 +19,11 @@ pub static mut BUF: [u8; 600] = [0; 600];
 // byte before timing out and calling `receive_complete`.
 const UART_RECEIVE_TIMEOUT: u8 = 100;
 
-const FLAGS_ADDRESS: usize = 0x400;
-const FIRST_ATTRIBUTE_ADDRESS: usize = 0x600;
+// Get the addresses in flash of key components from the linker file.
+extern "C" {
+    static _flags_address: u8;
+    static _attributes_address: u8;
+}
 
 // Bootloader constants
 const ESCAPE_CHAR: u8 = 0xFC;
@@ -113,6 +116,8 @@ pub struct Bootloader<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Fl
     page_buffer: TakeCell<'static, F::Page>,
     buffer: TakeCell<'static, [u8]>,
     state: Cell<State>,
+    flags_address: usize,
+    attributes_address: usize,
 }
 
 impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloader<'a, U, F> {
@@ -130,6 +135,8 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloa
             page_buffer: TakeCell::new(page_buffer),
             buffer: TakeCell::new(buffer),
             state: Cell::new(State::Idle),
+            flags_address: unsafe { (&_flags_address as *const u8) as usize },
+            attributes_address: unsafe { (&_attributes_address as *const u8) as usize },
         }
     }
 
@@ -260,7 +267,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                     self.page_buffer.take().map(move |page| {
                         // Calculate the page index given that flags start
                         // at address 1024.
-                        let page_index = FLAGS_ADDRESS / page.as_mut().len();
+                        let page_index = self.flags_address / page.as_mut().len();
 
                         let _ = self.flash.read_page(page_index, page);
                     });
@@ -331,7 +338,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                         // correct attribute (each attribute is 64 bytes long),
                         // where attributes start at address 0x600.
                         let page_len = page.as_mut().len();
-                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                        let read_address = self.attributes_address + (index as usize * 64);
                         let page_index = read_address / page_len;
 
                         let _ = self.flash.read_page(page_index, page);
@@ -364,7 +371,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                         // correct attribute (each attribute is 64 bytes long),
                         // where attributes start at address 0x600.
                         let page_len = page.as_mut().len();
-                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                        let read_address = self.attributes_address + (index as usize * 64);
                         let page_index = read_address / page_len;
 
                         let _ = self.flash.read_page(page_index, page);
@@ -379,7 +386,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                     // needs to be updated.
                     self.page_buffer.take().map(move |page| {
                         let page_len = page.as_mut().len();
-                        let page_index = FLAGS_ADDRESS / page_len;
+                        let page_index = self.flags_address / page_len;
 
                         let _ = self.flash.read_page(page_index, page);
                     });
@@ -438,7 +445,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::fl
                     }
 
                     // Calculate where in the page the flags start.
-                    let page_offset = FLAGS_ADDRESS % pagebuffer.as_mut().len();
+                    let page_offset = self.flags_address % pagebuffer.as_mut().len();
 
                     // Version string is at most 8 bytes long, and starts
                     // at index 14 in the bootloader page.
@@ -505,7 +512,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::fl
                     // attribute with attributes starting at address 0x600 and
                     // where each has length of 64 bytes.
                     let page_len = pagebuffer.as_mut().len();
-                    let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                    let read_address = self.attributes_address + (index as usize * 64);
                     let page_offset = read_address % page_len;
 
                     for i in 0..64 {
@@ -529,7 +536,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::fl
             State::SetAttribute { index } => {
                 self.buffer.map(move |buffer| {
                     let page_len = pagebuffer.as_mut().len();
-                    let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                    let read_address = self.attributes_address + (index as usize * 64);
                     let page_offset = read_address % page_len;
                     let page_index = read_address / page_len;
 
@@ -546,7 +553,7 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::fl
             // and then write that all back to flash.
             State::SetStartAddress { address } => {
                 let page_len = pagebuffer.as_mut().len();
-                let read_address = FLAGS_ADDRESS + 32;
+                let read_address = self.flags_address + 32;
                 let page_offset = read_address % page_len;
                 let page_index = read_address / page_len;
 
