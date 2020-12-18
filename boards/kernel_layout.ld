@@ -69,16 +69,18 @@ SECTIONS
          */
         KEEP(*(.vectors .vectors.*))
         KEEP(*(.irqs))
-        . = 1024;
     } > rom
 
     .attribute :
     {
+        . = ALIGN(1024);
         _attribute_table_start = .;
+        _flags_address = .;
         KEEP(*(.flags))
         /* Start attributes on next page */
         FILL(0x0)
         . = _attribute_table_start + 512;
+        _attributes_address = .;
         /* Remaining attributes */
         KEEP(*(.attributes .attribute.*))
         FILL(0x0)
