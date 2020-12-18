@@ -305,7 +305,11 @@ pub unsafe fn reset_handler() {
     // Need to disable the MPU because the bootloader seems to set it up.
     chip.mpu().clear_mpu();
 
-    debug!("Bootloader init");
+    extern "C" {
+        static _stext: u8;
+    }
+
+    debug!("Bootloader init {:?}", &_stext as *const u8);
 
     // Configure the USB stack to enable a serial port over CDC-ACM.
     cdc.enable();
