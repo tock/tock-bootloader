@@ -287,7 +287,7 @@ pub unsafe fn reset_handler() {
     );
     CHIP = Some(chip);
 
-    // Need to disable the MPU because the bootloader seems to set it up.
+    // Need to disable the MPU because the bossa bootloader seems to set it up.
     chip.mpu().clear_mpu();
 
     extern "C" {
