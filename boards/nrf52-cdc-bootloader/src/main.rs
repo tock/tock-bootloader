@@ -24,17 +24,15 @@ use kernel::{create_capability, debug, debug_gpio, debug_verbose, static_init};
 
 use capsules::virtual_alarm::VirtualMuxAlarm;
 
-use nrf52840::gpio::Pin;
 use nrf52840::interrupt_service::Nrf52840DefaultPeripherals;
 
-use nrf52_components::{self, UartChannel, UartPins};
-
-const LED_KERNEL_PIN: Pin = Pin::P0_13;
-
-const UART_RTS: Option<Pin> = Some(Pin::P0_05);
-const UART_TXD: Pin = Pin::P0_06;
-const UART_CTS: Option<Pin> = Some(Pin::P0_07);
-const UART_RXD: Pin = Pin::P0_08;
+// use nrf52840::gpio::Pin;
+// use nrf52_components::{self, UartChannel, UartPins};
+// const LED_KERNEL_PIN: Pin = Pin::P0_13;
+// const UART_RTS: Option<Pin> = Some(Pin::P0_05);
+// const UART_TXD: Pin = Pin::P0_06;
+// const UART_CTS: Option<Pin> = Some(Pin::P0_07);
+// const UART_RXD: Pin = Pin::P0_08;
 
 include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
 
@@ -137,19 +135,6 @@ pub unsafe fn reset_handler() {
     let main_loop_capability = create_capability!(capabilities::MainLoopCapability);
 
     //--------------------------------------------------------------------------
-    // DEBUG GPIO
-    //--------------------------------------------------------------------------
-
-    // Configure kernel debug GPIOs as early as possible. These are used by the
-    // `debug_gpio!(0, toggle)` macro. We configure these early so that the
-    // macro is available during most of the setup code and kernel execution.
-    kernel::debug::assign_gpios(
-        Some(&base_peripherals.gpio_port[LED_KERNEL_PIN]),
-        None,
-        None,
-    );
-
-    //--------------------------------------------------------------------------
     // Deferred Call (Dynamic) Setup
     //--------------------------------------------------------------------------
 
@@ -171,24 +156,24 @@ pub unsafe fn reset_handler() {
     let mux_alarm = components::alarm::AlarmMuxComponent::new(rtc)
         .finalize(components::alarm_mux_component_helper!(nrf52::rtc::Rtc));
 
-    //--------------------------------------------------------------------------
-    // UART DEBUGGING
-    //--------------------------------------------------------------------------
+    // //--------------------------------------------------------------------------
+    // // UART DEBUGGING
+    // //--------------------------------------------------------------------------
 
-    let channel = nrf52_components::UartChannelComponent::new(
-        UartChannel::Pins(UartPins::new(UART_RTS, UART_TXD, UART_CTS, UART_RXD)),
-        mux_alarm,
-        &base_peripherals.uarte0,
-    )
-    .finalize(());
+    // let channel = nrf52_components::UartChannelComponent::new(
+    //     UartChannel::Pins(UartPins::new(UART_RTS, UART_TXD, UART_CTS, UART_RXD)),
+    //     mux_alarm,
+    //     &base_peripherals.uarte0,
+    // )
+    // .finalize(());
 
-    // Create a shared UART channel for the console and for kernel debug.
-    let uart_mux =
-        components::console::UartMuxComponent::new(channel, 115200, dynamic_deferred_caller)
-            .finalize(());
+    // // Create a shared UART channel for the console and for kernel debug.
+    // let uart_mux =
+    //     components::console::UartMuxComponent::new(channel, 115200, dynamic_deferred_caller)
+    //         .finalize(());
 
-    // Create the debugger object that handles calls to `debug!()`.
-    components::debug_writer::DebugWriterComponent::new(uart_mux).finalize(());
+    // // Create the debugger object that handles calls to `debug!()`.
+    // components::debug_writer::DebugWriterComponent::new(uart_mux).finalize(());
 
     //--------------------------------------------------------------------------
     // CDC
@@ -309,7 +294,7 @@ pub unsafe fn reset_handler() {
         static _stext: u8;
     }
 
-    debug!("Bootloader init {:?}", &_stext as *const u8);
+    // debug!("Bootloader init {:?}", &_stext as *const u8);
 
     // Configure the USB stack to enable a serial port over CDC-ACM.
     cdc.enable();
