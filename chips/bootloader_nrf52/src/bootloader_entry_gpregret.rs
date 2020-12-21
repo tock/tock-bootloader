@@ -6,14 +6,16 @@
 use kernel::common::cells::VolatileCell;
 use kernel::common::StaticRef;
 
-/// Magic value for the GPREGRET register that tells the Adafruit bootloader to
-/// stay in bootloader mode. This value (and name) is taken from the Adafruit
-/// nRF52 bootloader.
-const DFU_MAGIC_SERIAL_ONLY_RESET: u32 = 0x4e;
-
 /// Magic value for the GPREGRET register that tells our bootloader to stay in
-/// bootloader mode. This value is based on the Adafruit nRF52 bootloader.
-const DFU_MAGIC_TOCK_BOOTLOADER: u32 = 0x99;
+/// bootloader mode. This value is based on the Adafruit nRF52 bootloader. This
+/// value is used by the kernel to set the flag so that the bootloader is
+/// entered after a soft reset.
+const DFU_MAGIC_TOCK_BOOTLOADER1: u32 = 0x90;
+/// Second magic value for the GPREGRET register that tells our bootloader to
+/// stay in bootloader mode. This value is based on the Adafruit nRF52
+/// bootloader. This value is set by the bootloader after deciding _not_ to stay
+/// in the bootloader just in case we want to chain bootloaders.
+const DFU_MAGIC_TOCK_BOOTLOADER2: u32 = 0x91;
 
 /// Magic value for the double reset memory location indicating we should stay
 /// in the bootloader. This value (and name) is taken from the Adafruit nRF52
@@ -46,8 +48,17 @@ impl bootloader::interfaces::BootloaderEntry for BootloaderEntryGpRegRet {
         // Check if the retention flag matches the special variable indicating
         // we should stay in the bootloader. This would be set by the kernel
         // before doing a reset to indicate we should reboot into the
-        // bootloader.
-        if self.nrf_power.get_gpregret() == DFU_MAGIC_TOCK_BOOTLOADER {
+        // bootloader. We also allow bootloader chaining
+        if self.nrf_power.get_gpregret() >= DFU_MAGIC_TOCK_BOOTLOADER1 {
+            // Clear flag so we do not get stuck in the bootloader.
+            self.nrf_power.set_gpregret(0);
+
+            return true;
+        }
+
+        // Check if this is the second bootloader. If so, we want to stay in the
+        // bootloader unconditionally.
+        if self.nrf_power.get_gpregret() >= DFU_MAGIC_TOCK_BOOTLOADER2 {
             // Clear flag so we do not get stuck in the bootloader.
             self.nrf_power.set_gpregret(0);
 
@@ -75,20 +86,9 @@ impl bootloader::interfaces::BootloaderEntry for BootloaderEntryGpRegRet {
         }
         self.double_reset.set(0);
 
-        // Set this register to the value the Adafruit bootloader expects so that
-        // the adafruit bootloader will stay in bootloader mode.
-        //
-        // There are three possible cases:
-        //
-        // 1. The adafruit bootloader does not exist. This is harmless in that
-        //    case.
-        // 2. The adafruit bootloader exists, but this bootloader is not jumping
-        //    to the start address of that bootloader. In that case, this is
-        //    still harmless.
-        // 3. The adafruit bootloader exists, and we might jump to it (if we are
-        //    not staying in this bootloader). In that case, setting this will
-        //    allow us to stay in the adafruit bootloader.
-        self.nrf_power.set_gpregret(DFU_MAGIC_SERIAL_ONLY_RESET);
+        // Set so that we will stick in the second bootloader if they are
+        // chained.
+        self.nrf_power.set_gpregret(DFU_MAGIC_TOCK_BOOTLOADER2);
 
         // Default to jumping out of the bootloader.
         false
