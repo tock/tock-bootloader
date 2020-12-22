@@ -272,6 +272,79 @@ pub unsafe fn reset_handler() {
     hil::flash::HasClient::set_client(flash_adapter, bootloader);
 
     //--------------------------------------------------------------------------
+    // ALTERNATIVE BOOTLOADER STACK
+    //
+    // This code is a starting point for using the bootloader on top of a normal
+    // UART rather than the USB stack.
+    //--------------------------------------------------------------------------
+
+    // // Setup receive with timeout.
+    // let recv_auto_virtual_alarm = static_init!(
+    //     VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
+    //     VirtualMuxAlarm::new(mux_alarm)
+    // );
+
+    // let recv_auto_uart = static_init!(
+    //     bootloader::uart_receive_timeout::UartReceiveTimeout<
+    //         'static,
+    //         VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
+    //     >,
+    //     bootloader::uart_receive_timeout::UartReceiveTimeout::new(
+    //         &nrf52::uart::UARTE0,
+    //         recv_auto_virtual_alarm,
+    //         &nrf5x::gpio::PORT[UART_RXD]
+    //     )
+    // );
+    // recv_auto_virtual_alarm.set_client(recv_auto_uart);
+    // nrf5x::gpio::PORT[UART_RXD].set_client(recv_auto_uart);
+    // recv_auto_uart.initialize();
+
+    // // Setup the UART pins
+    // nrf52::uart::UARTE0.initialize(
+    //     nrf5x::pinmux::Pinmux::new(UART_TXD as u32),
+    //     nrf5x::pinmux::Pinmux::new(UART_RXD as u32),
+    //     nrf5x::pinmux::Pinmux::new(UART_CTS as u32),
+    //     nrf5x::pinmux::Pinmux::new(UART_RTS as u32),
+    // );
+
+    // let nrfpagebuffer = static_init!(nrf52::nvmc::NrfPage, nrf52::nvmc::NrfPage::default());
+
+    // let flash_adapter = static_init!(
+    //     bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52::nvmc::Nvmc>,
+    //     bootloader::flash_large_to_small::FlashLargeToSmall::new(
+    //         &base_peripherals.nvmc,
+    //         nrfpagebuffer,
+    //     )
+    // );
+    // hil::flash::HasClient::set_client(&base_peripherals.nvmc, flash_adapter);
+
+    // let pagebuffer = static_init!(
+    //     bootloader::flash_large_to_small::FiveTwelvePage,
+    //     bootloader::flash_large_to_small::FiveTwelvePage::default()
+    // );
+
+    // let bootloader = static_init!(
+    //     bootloader::bootloader::Bootloader<
+    //         'static,
+    //         bootloader::uart_receive_timeout::UartReceiveTimeout<
+    //         'static,
+    //         VirtualMuxAlarm<'static, nrf5x::rtc::Rtc>,
+    //     >,
+    //         bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52::nvmc::Nvmc>,
+    //     >,
+    //     bootloader::bootloader::Bootloader::new(
+    //         nrf52::uart::UARTE0,
+    //         flash_adapter,
+    //         &bootloader_exit,
+    //         pagebuffer,
+    //         &mut bootloader::bootloader::BUF
+    //     )
+    // );
+    // hil::uart::Transmit::set_transmit_client(&nrf52::uart::UARTE0, bootloader);
+    // hil::uart::Receive::set_receive_client(&nrf52::uart::UARTE0, bootloader);
+    // hil::flash::HasClient::set_client(flash_adapter, bootloader);
+
+    //--------------------------------------------------------------------------
     // FINAL SETUP AND BOARD BOOT
     //--------------------------------------------------------------------------
 
