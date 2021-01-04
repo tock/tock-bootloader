@@ -7,14 +7,28 @@ use kernel::common::cells::VolatileCell;
 use kernel::common::StaticRef;
 
 /// Magic value for the GPREGRET register that tells our bootloader to stay in
-/// bootloader mode. This value is based on the Adafruit nRF52 bootloader. This
-/// value is used by the kernel to set the flag so that the bootloader is
+/// bootloader mode. This value is not the same as the Adafruit nRF52 bootloader
+/// because we don't need them to conflict and we want to be able to chain nRF52
+/// bootloaders.
+///
+/// This value is used by the kernel to set the flag so that the bootloader is
 /// entered after a soft reset.
 const DFU_MAGIC_TOCK_BOOTLOADER1: u32 = 0x90;
 /// Second magic value for the GPREGRET register that tells our bootloader to
-/// stay in bootloader mode. This value is based on the Adafruit nRF52
-/// bootloader. This value is set by the bootloader after deciding _not_ to stay
-/// in the bootloader just in case we want to chain bootloaders.
+/// stay in bootloader mode. This value is set by the bootloader after deciding
+/// _not_ to stay in the bootloader just in case we want to chain bootloaders.
+/// That is, if there are two Tock bootloaders flashed on a chip:
+///
+/// ```
+/// Address
+/// 0x0:     Tock Bootloader
+/// 0x10000: Tock Bootloader (second)
+/// 0x20000: Other code (or nothing)
+/// ```
+///
+/// This is an unusual situation, and is intended to only happen when
+/// updating/changing bootloaders. To make it easy to skip through the first but
+/// stay in the second, we use this magic value.
 const DFU_MAGIC_TOCK_BOOTLOADER2: u32 = 0x91;
 
 /// Magic value for the double reset memory location indicating we should stay
