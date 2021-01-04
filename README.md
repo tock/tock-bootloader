@@ -2,7 +2,7 @@
 
 The Tock bootloader provides a utility for flashing applications onto
 a board over USB. It is compatible with the
-[tockloader](https://github.com/helena-project/tockloader) utility.
+[tockloader](https://github.com/tock/tockloader) utility.
 
 The Tock bootloader is implemented on top of the Tock OS itself.
 
@@ -25,12 +25,20 @@ make flash
 Bootloader Operation
 --------------------
 
-When reset, the board enters the bootloader and checks the status of the
-`BOOTLOADER_SELECT_PIN`. If the pin is high, the bootloader exits by
-moving the location of the vector table to address `0x10000` and then
-jumping to that address. If the pin is low, the board enters bootloader mode
-and waits for commands to be sent over UART. To exit the bootloader mode,
-the chip must be reset with the `BOOTLOADER_SELECT_PIN` pulled high.
+When reset, the board enters the bootloader and checks whether it should
+continue to run the bootloader, or jump to the kernel. The bootloader uses the
+`BootloaderEntry` trait to determine if it should stay in the bootloader. The
+method of staying in the bootloader can vary based on the board. Some options:
+
+- Check a GPIO pin. If the pin is high then stay in the bootloader.
+- Check a special memory address or register. If a magic value is stored there,
+  then stay in the bootloader.
+
+If the bootloader exists, it uses the `Jumper` trait to start executing from a
+different starting address. This implementation is likely architecture-specific.
+
+The address the bootloader jumps to is stored in the bootloader flags section in
+flash. See below for more information.
 
 The list of valid commands the bootloader accepts is in the
 [Protocol](#over-the-wire-protocol) section. At a high level, the commands
@@ -413,19 +421,6 @@ Attribute format:
 Changelog
 --------------------
 
-- Version 1.0.2
+- Version 1.1.0
   - Added Exit command.
   - Added SetStartAddress command.
-
-
-
-Future Goals
-------------
-
-The bootloader is stable, but there are future improvements we would like
-to see added:
-
-- Arbitrary code start location. Right now the bootloader assumes that the main
-application code is at address `0x10000`, and that is currently a hardcoded
-value. This should ideally be a special flag that can get updated if we want
-to move the main code (for Tock the kernel) to a different address.
