@@ -4,8 +4,12 @@ version = "0.1.0"
 authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
 
 [dependencies]
-#kernel = { git = "https://github.com/tock/tock", branch = "master" }
-kernel = { path = "../../../tock/kernel" }
-nrf52 = { path = "../../../tock/chips/nrf52" }
-cortexm4 = { path = "../../../tock/arch/cortex-m4" }
+kernel = { git = "https://github.com/tock/tock", branch = "master" }
+nrf52 = { git = "https://github.com/tock/tock", branch = "master" }
+cortexm4 = { git = "https://github.com/tock/tock", branch = "master" }
+
+#kernel = { path = "../../../tock/kernel" }
+#nrf52 = { path = "../../../tock/chips/nrf52" }
+#cortexm4 = { path = "../../../tock/arch/cortex-m4" }
+
 bootloader = { path = "../../bootloader" }
