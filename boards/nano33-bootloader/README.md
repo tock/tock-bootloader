@@ -17,7 +17,7 @@ Here are the steps:
 
 ```
 make
-cp ../../target/thumbv7em-none-eabi/release/nano33-bootloader.bin ~/nano33-bootloader-0x00000.bin
+cp ../../target/thumbv7em-none-eabi/release/nano33-bootloader.bin ./nano33-bootloader-0x00000.bin
 
 
 # Edit layout.ld.
@@ -29,7 +29,7 @@ cp ../../target/thumbv7em-none-eabi/release/nano33-bootloader.bin ~/nano33-bootl
 #        "bootloader_attributes::write_flags(&mut f, "1.1.0", 0x20000);"
 
 make
-cp ../../target/thumbv7em-none-eabi/release/nano33-bootloader.bin ~/nano33-bootloader-0x10000.bin
+cp ../../target/thumbv7em-none-eabi/release/nano33-bootloader.bin ./nano33-bootloader-0x10000.bin
 
 # Undo changes
 git stash
