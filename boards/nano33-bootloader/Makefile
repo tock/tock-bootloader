@@ -3,16 +3,15 @@
 
 TOCK_ARCH=cortex-m4
 TARGET=thumbv7em-none-eabi
-PLATFORM=nrf52-cdc-bootloader
+PLATFORM=nano33-bootloader
 
 include ../Common.mk
 
 TOCKLOADER=tockloader
 
-# Where in the SAM4L flash to load the kernel with `tockloader`
+# Where in the flash to load the kernel with `tockloader`
 KERNEL_ADDRESS=0x00000
 
-# Upload programs over uart with tockloader
 ifdef PORT
   TOCKLOADER_GENERAL_FLAGS += --port $(PORT)
 endif
