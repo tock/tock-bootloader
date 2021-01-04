@@ -79,12 +79,11 @@ impl<'a> BootloaderEnterer<'a> {
     pub fn new(
         entry_decider: &'a dyn interfaces::BootloaderEntry,
         jumper: &'a dyn interfaces::Jumper,
-        bootloader_flags_address: u32,
     ) -> BootloaderEnterer<'a> {
         BootloaderEnterer {
             entry_decider,
             jumper,
-            bootloader_flags_address,
+            bootloader_flags_address: unsafe { (&_flags_address as *const u8) as u32 },
         }
     }
 

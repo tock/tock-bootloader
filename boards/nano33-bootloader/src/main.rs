@@ -116,11 +116,7 @@ pub unsafe fn reset_handler() {
 
     let bootloader_enterer = static_init!(
         bootloader::bootloader::BootloaderEnterer<'static>,
-        bootloader::bootloader::BootloaderEnterer::new(
-            bootloader_entry_mode,
-            bootloader_jumper,
-            1024
-        )
+        bootloader::bootloader::BootloaderEnterer::new(bootloader_entry_mode, bootloader_jumper)
     );
 
     // First decide if we want to actually run the bootloader or not.
