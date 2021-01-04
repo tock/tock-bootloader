@@ -13,7 +13,7 @@ use kernel::common::StaticRef;
 ///
 /// This value is used by the kernel to set the flag so that the bootloader is
 /// entered after a soft reset.
-const DFU_MAGIC_TOCK_BOOTLOADER1: u32 = 0x90;
+const DFU_MAGIC_TOCK_BOOTLOADER1: u8 = 0x90;
 /// Second magic value for the GPREGRET register that tells our bootloader to
 /// stay in bootloader mode. This value is set by the bootloader after deciding
 /// _not_ to stay in the bootloader just in case we want to chain bootloaders.
@@ -29,7 +29,7 @@ const DFU_MAGIC_TOCK_BOOTLOADER1: u32 = 0x90;
 /// This is an unusual situation, and is intended to only happen when
 /// updating/changing bootloaders. To make it easy to skip through the first but
 /// stay in the second, we use this magic value.
-const DFU_MAGIC_TOCK_BOOTLOADER2: u32 = 0x91;
+const DFU_MAGIC_TOCK_BOOTLOADER2: u8 = 0x91;
 
 /// Magic value for the double reset memory location indicating we should stay
 /// in the bootloader. This value (and name) is taken from the Adafruit nRF52
