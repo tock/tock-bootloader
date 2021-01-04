@@ -6,7 +6,6 @@
 // Disable this attribute when documenting, as a workaround for
 // https://github.com/rust-lang/rust/issues/62184.
 #![cfg_attr(not(doc), no_main)]
-#![feature(const_in_array_repeat_expressions)]
 
 use core::panic::PanicInfo;
 
@@ -358,12 +357,6 @@ pub unsafe fn reset_handler() {
 
     // Need to disable the MPU because the bossa bootloader seems to set it up.
     chip.mpu().clear_mpu();
-
-    extern "C" {
-        static _stext: u8;
-    }
-
-    // debug!("Bootloader init {:?}", &_stext as *const u8);
 
     // Configure the USB stack to enable a serial port over CDC-ACM.
     cdc.enable();
