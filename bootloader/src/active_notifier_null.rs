@@ -13,5 +13,5 @@ impl ActiveNotifierNull {
 }
 
 impl interfaces::ActiveNotifier for ActiveNotifierNull {
-    fn active(&self) {}
+    fn active(&mut self) {}
 }

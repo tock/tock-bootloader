@@ -70,7 +70,7 @@ enum State {
 pub struct BootloaderEnterer<'a> {
     entry_decider: &'a dyn interfaces::BootloaderEntry,
     jumper: &'a dyn interfaces::Jumper,
-    active_notifier: &'a dyn interfaces::ActiveNotifier,
+    active_notifier: &'a mut dyn interfaces::ActiveNotifier,
     /// This is the address of flash where the flags region of the bootloader
     /// start. We need this to determine what address to jump to.
     bootloader_flags_address: u32,
@@ -80,7 +80,7 @@ impl<'a> BootloaderEnterer<'a> {
     pub fn new(
         entry_decider: &'a dyn interfaces::BootloaderEntry,
         jumper: &'a dyn interfaces::Jumper,
-        active_notifier: &'a dyn interfaces::ActiveNotifier,
+        active_notifier: &'a mut dyn interfaces::ActiveNotifier,
     ) -> BootloaderEnterer<'a> {
         BootloaderEnterer {
             entry_decider,
@@ -90,7 +90,7 @@ impl<'a> BootloaderEnterer<'a> {
         }
     }
 
-    pub fn check(&self) {
+    pub fn check(&mut self) {
         if !self.entry_decider.stay_in_bootloader() {
             // Jump to the kernel and start the real code.
             self.jump();

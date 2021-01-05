@@ -7,6 +7,7 @@
 #[macro_use(debug, debug_gpio)]
 extern crate kernel;
 
+pub mod active_notifier_ledon;
 pub mod active_notifier_null;
 pub mod bootloader;
 pub mod bootloader_crc;

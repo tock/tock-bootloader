@@ -22,5 +22,5 @@ pub trait Jumper {
 pub trait ActiveNotifier {
     /// Called when the bootloader decides it will stay active (i.e. not jump to
     /// the kernel).
-    fn active(&self);
+    fn active(&mut self);
 }

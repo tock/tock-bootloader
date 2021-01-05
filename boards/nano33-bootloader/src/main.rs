@@ -33,6 +33,9 @@ use nrf52840::interrupt_service::Nrf52840DefaultPeripherals;
 // const UART_CTS: Option<Pin> = Some(Pin::P0_07);
 // const UART_RXD: Pin = Pin::P0_08;
 
+// const LED_ON_PIN: nrf52840::gpio::Pin = nrf52840::gpio::Pin::P1_09;
+const LED_ON_PIN: nrf52840::gpio::Pin = nrf52840::gpio::Pin::P0_13;
+
 include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
 
 // Number of concurrent processes this platform supports.
@@ -113,9 +116,14 @@ pub unsafe fn reset_handler() {
         bootloader_cortexm::jumper::CortexMJumper::new()
     );
 
+    let active_notifier_led = static_init!(
+        kernel::hil::led::LedHigh<'static, nrf52840::gpio::GPIOPin>,
+        kernel::hil::led::LedHigh::new(&base_peripherals.gpio_port[LED_ON_PIN])
+    );
+
     let bootloader_active_notifier = static_init!(
-        bootloader::active_notifier_null::ActiveNotifierNull,
-        bootloader::active_notifier_null::ActiveNotifierNull::new()
+        bootloader::active_notifier_ledon::ActiveNotifierLedon,
+        bootloader::active_notifier_ledon::ActiveNotifierLedon::new(active_notifier_led)
     );
 
     let bootloader_enterer = static_init!(
