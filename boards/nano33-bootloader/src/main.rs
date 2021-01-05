@@ -113,9 +113,18 @@ pub unsafe fn reset_handler() {
         bootloader_cortexm::jumper::CortexMJumper::new()
     );
 
+    let bootloader_active_notifier = static_init!(
+        bootloader::active_notifier_null::ActiveNotifierNull,
+        bootloader::active_notifier_null::ActiveNotifierNull::new()
+    );
+
     let bootloader_enterer = static_init!(
         bootloader::bootloader::BootloaderEnterer<'static>,
-        bootloader::bootloader::BootloaderEnterer::new(bootloader_entry_mode, bootloader_jumper)
+        bootloader::bootloader::BootloaderEnterer::new(
+            bootloader_entry_mode,
+            bootloader_jumper,
+            bootloader_active_notifier
+        )
     );
 
     // First decide if we want to actually run the bootloader or not.

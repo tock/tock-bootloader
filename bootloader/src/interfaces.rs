@@ -17,3 +17,10 @@ pub trait Jumper {
     /// executing there.
     fn jump(&self, address: u32) -> !;
 }
+
+/// Trait for notifying the user the bootloader is active.
+pub trait ActiveNotifier {
+    /// Called when the bootloader decides it will stay active (i.e. not jump to
+    /// the kernel).
+    fn active(&self);
+}
