@@ -33,8 +33,7 @@ use nrf52840::interrupt_service::Nrf52840DefaultPeripherals;
 // const UART_CTS: Option<Pin> = Some(Pin::P0_07);
 // const UART_RXD: Pin = Pin::P0_08;
 
-// const LED_ON_PIN: nrf52840::gpio::Pin = nrf52840::gpio::Pin::P1_09;
-const LED_ON_PIN: nrf52840::gpio::Pin = nrf52840::gpio::Pin::P0_13;
+const LED_ON_PIN: nrf52840::gpio::Pin = nrf52840::gpio::Pin::P1_09;
 
 include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
 
