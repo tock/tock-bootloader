@@ -1,5 +1,5 @@
 [package]
-name = "nano33-bootloader"
+name = "nano33ble-bootloader"
 version = "0.1.0"
 authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
 build = "build.rs"

@@ -3,7 +3,7 @@
 
 TOCK_ARCH=cortex-m4
 TARGET=thumbv7em-none-eabi
-PLATFORM=nano33-bootloader
+PLATFORM=nano33ble-bootloader
 
 include ../Common.mk
 
