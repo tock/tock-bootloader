@@ -146,7 +146,8 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveAdvanced<'a>
 
 impl<'a, A: hil::time::Alarm<'a>> hil::uart::UartAdvanced<'a>
     for UartReceiveMultipleTimeout<'a, A>
-{}
+{
+}
 
 impl<'a, A: hil::time::Alarm<'a>> hil::time::AlarmClient for UartReceiveMultipleTimeout<'a, A> {
     /// If the timer actually fires then we stopped receiving bytes.

@@ -149,6 +149,5 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveTimeou
         _rval: ReturnCode,
         _error: hil::uart::Error,
     ) {
-
     }
 }
