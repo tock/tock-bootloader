@@ -23,8 +23,8 @@ const UART_RECEIVE_TIMEOUT: u8 = 100;
 extern "C" {
     static _flags_address: u8;
     static _attributes_address: u8;
-    static _textstart: u8;
-    static _erelocate: u8;
+    static _stext: u8;
+    static _etext: u8;
 }
 
 // Bootloader constants
@@ -150,8 +150,8 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloa
             state: Cell::new(State::Idle),
             flags_address: unsafe { (&_flags_address as *const u8) as usize },
             attributes_address: unsafe { (&_attributes_address as *const u8) as usize },
-            bootloader_address: unsafe { (&_textstart as *const u8) as u32 },
-            bootloader_end_address: unsafe { (&_erelocate as *const u8) as u32 },
+            bootloader_address: unsafe { (&_stext as *const u8) as u32 },
+            bootloader_end_address: unsafe { (&_etext as *const u8) as u32 },
         }
     }
 
