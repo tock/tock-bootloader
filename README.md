@@ -424,3 +424,4 @@ Changelog
 - Version 1.1.0
   - Added Exit command.
   - Added SetStartAddress command.
+  - Restore `BADADDR` error when trying to overwrite the bootloader itself.

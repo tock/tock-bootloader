@@ -23,12 +23,15 @@ const UART_RECEIVE_TIMEOUT: u8 = 100;
 extern "C" {
     static _flags_address: u8;
     static _attributes_address: u8;
+    static _textstart: u8;
+    static _erelocate: u8;
 }
 
 // Bootloader constants
 const ESCAPE_CHAR: u8 = 0xFC;
 
 const RES_PONG: u8 = 0x11;
+const RES_BADADDR: u8 = 0x12;
 const RES_INTERNAL_ERROR: u8 = 0x13;
 const RES_BADARGS: u8 = 0x14;
 const RES_OK: u8 = 0x15;
@@ -124,6 +127,10 @@ pub struct Bootloader<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Fl
     state: Cell<State>,
     flags_address: usize,
     attributes_address: usize,
+    /// Address of the bootloader in flash.
+    bootloader_address: u32,
+    /// Address after the bootloader in flash.
+    bootloader_end_address: u32,
 }
 
 impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloader<'a, U, F> {
@@ -143,6 +150,8 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloa
             state: Cell::new(State::Idle),
             flags_address: unsafe { (&_flags_address as *const u8) as usize },
             attributes_address: unsafe { (&_attributes_address as *const u8) as usize },
+            bootloader_address: unsafe { (&_textstart as *const u8) as u32 },
+            bootloader_end_address: unsafe { (&_erelocate as *const u8) as u32 },
         }
     }
 
@@ -300,6 +309,17 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
                             // to write to flash.
                             buffer[0] = ESCAPE_CHAR;
                             buffer[1] = RES_BADARGS;
+                            self.page_buffer.replace(page);
+                            self.state.set(State::Idle);
+                            self.uart.transmit_buffer(buffer, 2);
+                        } else if address >= self.bootloader_address
+                            && address < self.bootloader_end_address
+                        {
+                            // Do not allow the bootloader to try to overwrite
+                            // itself. This will largely not work, and would be
+                            // irreversible for the user.
+                            buffer[0] = ESCAPE_CHAR;
+                            buffer[1] = RES_BADADDR;
                             self.page_buffer.replace(page);
                             self.state.set(State::Idle);
                             self.uart.transmit_buffer(buffer, 2);
