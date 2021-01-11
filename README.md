@@ -2,7 +2,7 @@
 
 The Tock bootloader provides a utility for flashing applications onto
 a board over USB. It is compatible with the
-[tockloader](https://github.com/helena-project/tockloader) utility.
+[tockloader](https://github.com/tock/tockloader) utility.
 
 The Tock bootloader is implemented on top of the Tock OS itself.
 
@@ -25,12 +25,20 @@ make flash
 Bootloader Operation
 --------------------
 
-When reset, the board enters the bootloader and checks the status of the
-`BOOTLOADER_SELECT_PIN`. If the pin is high, the bootloader exits by
-moving the location of the vector table to address `0x10000` and then
-jumping to that address. If the pin is low, the board enters bootloader mode
-and waits for commands to be sent over UART. To exit the bootloader mode,
-the chip must be reset with the `BOOTLOADER_SELECT_PIN` pulled high.
+When reset, the board enters the bootloader and checks whether it should
+continue to run the bootloader, or jump to the kernel. The bootloader uses the
+`BootloaderEntry` trait to determine if it should stay in the bootloader. The
+method of staying in the bootloader can vary based on the board. Some options:
+
+- Check a GPIO pin. If the pin is high then stay in the bootloader.
+- Check a special memory address or register. If a magic value is stored there,
+  then stay in the bootloader.
+
+If the bootloader exists, it uses the `Jumper` trait to start executing from a
+different starting address. This implementation is likely architecture-specific.
+
+The address the bootloader jumps to is stored in the bootloader flags section in
+flash. See below for more information.
 
 The list of valid commands the bootloader accepts is in the
 [Protocol](#over-the-wire-protocol) section. At a high level, the commands
@@ -342,15 +350,78 @@ Set a new baud rate for the bootloader.
 - `Message`: `None`.
 
 
+#### `EXIT`
+
+Exit the bootloader.
+
+##### Command
+- `Command`: `0x22`.
+- `Message`: `None`.
+
+##### Response
+None.
 
 
-Future Goals
-------------
 
-The bootloader is stable, but there are future improvements we would like
-to see added:
+Flags and Attributes
+--------------------
 
-- Arbitrary code start location. Right now the bootloader assumes that the main
-application code is at address `0x10000`, and that is currently a hardcoded
-value. This should ideally be a special flag that can get updated if we want
-to move the main code (for Tock the kernel) to a different address.
+The bootloader includes space near the beginning of the bootloader's space in flash for
+flags and attributes. Attributes are key-value pairs used to store various properties of
+the board. Flags are specified values for use by the bootloader.
+
+### Flags
+
+The flag section is 512 bytes long. Most of the section is reserved for future
+use.
+
+```
+ Bytes
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|T|O|C|K|B|O|O|T|L|O|A|D|E|R| Version Str   |  Reserved         |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Start | Reserved...
++-+-+-+-+-+-+-+-+-+-+-+-+
+```
+
+- `TOCKBOOTLOADER`: The first fourteen bytes contain the string
+  "TOCKBOOTLOADER".
+- `Version Str`: The next 8 bytes contain an ASCII string of the bootloader
+  version.
+- `Start`: Four bytes of the start address to jump to if the bootloader is not
+  entered.
+
+### Attributes
+
+The attributes section occupies the next 1024 bytes. Each attribute uses 64
+bytes of space. There can be up to 16 attributes.
+
+Attribute format:
+
+```
+ Bytes
+ 0                   1                   2                   3
+ 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Key         | Value
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                                                                |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+```
+
+- `Key`: The key can be up to 8 bytes long. Keys are `\0` padded to consume all
+  8 bytes.
+- `Value`: Values can be up to 56 bytes long.
+
+
+
+
+Changelog
+--------------------
+
+- Version 1.1.0
+  - Added Exit command.
+  - Added SetStartAddress command.
+  - Restore `BADADDR` error when trying to overwrite the bootloader itself.

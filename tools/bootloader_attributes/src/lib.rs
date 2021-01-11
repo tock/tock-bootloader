@@ -9,15 +9,14 @@ use std::path::Path;
 pub static ATTRIBUTES_FILE: &'static str = "attributes.rs";
 
 /// Write the "flags" region as an array.
-pub fn write_flags<W: Write>(dest: &mut W, page_size: usize, version: &str) {
+pub fn write_flags<W: Write>(dest: &mut W, version: &str, start_address: u32) {
     let _ = write!(
         dest,
         "
 #[link_section=\".flags\"]
 #[no_mangle]
-pub static FLAGS: [u8; {}] = [
-    ",
-        page_size
+pub static FLAGS: [u8; 512] = [
+    "
     );
 
     // Boot in bootloader identifier flag.
@@ -25,13 +24,22 @@ pub static FLAGS: [u8; {}] = [
         let _ = write!(dest, "{:#x}, ", byte);
     }
 
-    // Write up to 8 bytes for the bootloader versrion.
+    // Write up to 8 bytes for the bootloader version.
     for byte in version.bytes().chain(iter::repeat(0)).take(8) {
         let _ = write!(dest, "{:#x}, ", byte);
     }
 
+    // Fill in reserved bytes
+    for _ in 0..10 {
+        let _ = write!(dest, "{:#x}, ", 0);
+    }
+
+    for byte in start_address.to_le_bytes().iter() {
+        let _ = write!(dest, "{:#x}, ", byte);
+    }
+
     // Fill in the rest of the 0 bytes
-    for _ in 0..490 {
+    for _ in 0..476 {
         let _ = write!(dest, "{:#x}, ", 0);
     }
 

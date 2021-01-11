@@ -4,27 +4,34 @@ use core::cell::Cell;
 use core::cmp;
 
 use kernel::common::cells::TakeCell;
+use kernel::common::cells::VolatileCell;
+use kernel::common::StaticRef;
 use kernel::hil;
 
 use bootloader_crc;
-
-extern crate tockloader_proto;
+use interfaces;
 
 // Main buffer that commands are received into and sent from.
-// Need a buffer big enough for 4096 byte pages on the nRF52.
-pub static mut BUF: [u8; 4224] = [0; 4224];
+// Need a buffer big enough for 512 byte pages.
+pub static mut BUF: [u8; 600] = [0; 600];
 
 // How long to wait, in bit periods, after receiving a byte for the next
 // byte before timing out and calling `receive_complete`.
 const UART_RECEIVE_TIMEOUT: u8 = 100;
 
-const FLAGS_ADDRESS: usize = 0x400;
-const FIRST_ATTRIBUTE_ADDRESS: usize = 0x600;
+// Get the addresses in flash of key components from the linker file.
+extern "C" {
+    static _flags_address: u8;
+    static _attributes_address: u8;
+    static _stext: u8;
+    static _etext: u8;
+}
 
 // Bootloader constants
 const ESCAPE_CHAR: u8 = 0xFC;
 
 const RES_PONG: u8 = 0x11;
+const RES_BADADDR: u8 = 0x12;
 const RES_INTERNAL_ERROR: u8 = 0x13;
 const RES_BADARGS: u8 = 0x14;
 const RES_OK: u8 = 0x15;
@@ -45,6 +52,9 @@ enum State {
     SetAttribute {
         index: u8,
     },
+    SetStartAddress {
+        address: u32,
+    },
     WriteFlashPage,
     ReadRange {
         address: u32,
@@ -58,77 +68,107 @@ enum State {
     },
 }
 
-pub struct Bootloader<
-    'a,
-    U: hil::uart::UARTReceiveAdvanced + 'a,
-    F: hil::flash::Flash + 'static,
-    G: hil::gpio::Pin + 'a,
-> {
-    uart: &'a U,
-    flash: &'a F,
-    select_pin: &'a G,
-    page_buffer: TakeCell<'static, F::Page>,
-    buffer: TakeCell<'static, [u8]>,
-    state: Cell<State>,
+/// This struct handles whether we should enter the bootloader or go straight to
+/// the kernel.
+pub struct BootloaderEnterer<'a> {
+    entry_decider: &'a dyn interfaces::BootloaderEntry,
+    jumper: &'a dyn interfaces::Jumper,
+    active_notifier: &'a mut dyn interfaces::ActiveNotifier,
+    /// This is the address of flash where the flags region of the bootloader
+    /// start. We need this to determine what address to jump to.
+    bootloader_flags_address: u32,
 }
 
-impl<
-        'a,
-        U: hil::uart::UARTReceiveAdvanced + 'a,
-        F: hil::flash::Flash + 'a,
-        G: hil::gpio::Pin + 'a,
-    > Bootloader<'a, U, F, G>
-{
+impl<'a> BootloaderEnterer<'a> {
     pub fn new(
-        uart: &'a U,
-        flash: &'a F,
-        select_pin: &'a G,
-        page_buffer: &'static mut F::Page,
-        buffer: &'static mut [u8],
-    ) -> Bootloader<'a, U, F, G> {
-        Bootloader {
-            uart: uart,
-            flash: flash,
-            select_pin: select_pin,
-            page_buffer: TakeCell::new(page_buffer),
-            buffer: TakeCell::new(buffer),
-            state: Cell::new(State::Idle),
+        entry_decider: &'a dyn interfaces::BootloaderEntry,
+        jumper: &'a dyn interfaces::Jumper,
+        active_notifier: &'a mut dyn interfaces::ActiveNotifier,
+    ) -> BootloaderEnterer<'a> {
+        BootloaderEnterer {
+            entry_decider,
+            jumper,
+            active_notifier,
+            bootloader_flags_address: unsafe { (&_flags_address as *const u8) as u32 },
         }
     }
 
-    pub fn initialize(&self) {
+    pub fn check(&mut self) {
+        if !self.entry_decider.stay_in_bootloader() {
+            // Jump to the kernel and start the real code.
+            self.jump();
+        } else {
+            // Staying in the bootloader, allow a custom active notification to
+            // start.
+            self.active_notifier.active();
+        }
+    }
+
+    fn jump(&self) {
+        // Address of the start address in the flags region is 32 bytes from the start.
+        let start_address_memory_location = self.bootloader_flags_address + 32;
+
+        let start_address_ptr: StaticRef<VolatileCell<u32>> =
+            unsafe { StaticRef::new(start_address_memory_location as *const VolatileCell<u32>) };
+
+        let start_address = start_address_ptr.get();
+
+        self.jumper.jump(start_address);
+    }
+}
+
+/// The main bootloader code.
+pub struct Bootloader<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'static> {
+    uart: &'a U,
+    flash: &'a F,
+    reset_function: &'a (dyn Fn() + 'a),
+    page_buffer: TakeCell<'static, F::Page>,
+    buffer: TakeCell<'static, [u8]>,
+    state: Cell<State>,
+    flags_address: usize,
+    attributes_address: usize,
+    /// Address of the bootloader in flash.
+    bootloader_address: u32,
+    /// Address after the bootloader in flash.
+    bootloader_end_address: u32,
+}
+
+impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> Bootloader<'a, U, F> {
+    pub fn new(
+        uart: &'a U,
+        flash: &'a F,
+        reset_function: &'a (dyn Fn() + 'a),
+        page_buffer: &'static mut F::Page,
+        buffer: &'static mut [u8],
+    ) -> Bootloader<'a, U, F> {
+        Bootloader {
+            uart: uart,
+            flash: flash,
+            reset_function: reset_function,
+            page_buffer: TakeCell::new(page_buffer),
+            buffer: TakeCell::new(buffer),
+            state: Cell::new(State::Idle),
+            flags_address: unsafe { (&_flags_address as *const u8) as usize },
+            attributes_address: unsafe { (&_attributes_address as *const u8) as usize },
+            bootloader_address: unsafe { (&_stext as *const u8) as u32 },
+            bootloader_end_address: unsafe { (&_etext as *const u8) as u32 },
+        }
+    }
+
+    pub fn start(&self) {
         // Setup UART and start listening.
-        self.uart.configure(hil::uart::UARTParameters {
+        self.uart.configure(hil::uart::Parameters {
             baud_rate: 115200,
+            width: hil::uart::Width::Eight,
             stop_bits: hil::uart::StopBits::One,
             parity: hil::uart::Parity::None,
             hw_flow_control: false,
         });
 
-        self.select_pin.make_input();
-
-        // Check the select pin to see if we should enter bootloader mode.
-        let mut samples = 10000;
-        let mut active = 0;
-        let mut inactive = 0;
-        while samples > 0 {
-            if self.select_pin.read() == false {
-                active += 1;
-            } else {
-                inactive += 1;
-            }
-            samples -= 1;
-        }
-
-        if active > inactive {
-            // Looks like we do want bootloader mode.
-            self.buffer.take().map(|buffer| {
-                self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
-            });
-        } else {
-            // Jump to the kernel and start the real code.
-            self.jump();
-        }
+        self.buffer.take().map(|buffer| {
+            self.uart
+                .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
+        });
     }
 
     // Helper function for sending single byte responses.
@@ -136,35 +176,21 @@ impl<
         self.buffer.take().map(|buffer| {
             buffer[0] = ESCAPE_CHAR;
             buffer[1] = response;
-            self.uart.transmit(buffer, 2);
+            self.uart.transmit_buffer(buffer, 2);
         });
-    }
-
-    fn jump(&self) {
-        unsafe {
-            asm!(
-                    ".syntax unified                        \n\
-                    ldr r0, =0x10000    // The address of the payload's .vectors                                       \n\
-                    ldr r1, =0xe000ed08 // The address of the VTOR register (0xE000E000(SCS) + 0xD00(SCB) + 0x8(VTOR)) \n\
-                    str r0, [r1]        // Move the payload's VT address into the VTOR register                        \n\
-                    ldr r1, [r0]        // Move the payload's initial SP into r1                                       \n\
-                    mov sp, r1          // Set our SP to that                                                          \n\
-                    ldr r0, [r0, #4]    // Load the payload's ENTRY into r0                                            \n\
-                    bx  r0              // Whoopee"
-                );
-        }
     }
 }
 
-impl<
-        'a,
-        U: hil::uart::UARTReceiveAdvanced + 'a,
-        F: hil::flash::Flash + 'a,
-        G: hil::gpio::Pin + 'a,
-    > hil::uart::Client for Bootloader<'a, U, F, G>
+impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::uart::TransmitClient
+    for Bootloader<'a, U, F>
 {
-    fn transmit_complete(&self, buffer: &'static mut [u8], error: hil::uart::Error) {
-        if error != hil::uart::Error::CommandComplete {
+    fn transmitted_buffer(
+        &self,
+        buffer: &'static mut [u8],
+        _tx_len: usize,
+        error: kernel::ReturnCode,
+    ) {
+        if error != kernel::ReturnCode::SUCCESS {
             // self.led.clear();
         } else {
             match self.state.get() {
@@ -179,32 +205,44 @@ impl<
                     // We are either done, or need to setup the next read.
                     if remaining_length == 0 {
                         self.state.set(State::Idle);
-                        self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                        self.uart
+                            .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                     } else {
                         self.buffer.replace(buffer);
                         self.page_buffer.take().map(move |page| {
                             let page_size = page.as_mut().len();
-                            self.flash.read_page(address as usize / page_size, page);
+                            let _ = self.flash.read_page(address as usize / page_size, page);
                         });
                     }
                 }
 
                 _ => {
-                    self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                    self.uart
+                        .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                 }
             }
         }
     }
+}
 
-    fn receive_complete(&self, buffer: &'static mut [u8], rx_len: usize, error: hil::uart::Error) {
-        if error != hil::uart::Error::CommandComplete {
+impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::uart::ReceiveClient
+    for Bootloader<'a, U, F>
+{
+    fn received_buffer(
+        &self,
+        buffer: &'static mut [u8],
+        rx_len: usize,
+        rval: kernel::ReturnCode,
+        _error: hil::uart::Error,
+    ) {
+        if rval != kernel::ReturnCode::SUCCESS {
             return;
         }
 
         // Tool to parse incoming bootloader messages.
         // This is currently allocated on the stack, but it too needs a big
         // buffer, and we need to do something about that.
-        let mut decoder = tockloader_proto::CommandDecoder::new();
+        let mut decoder = tock_bootloader_protocol::CommandDecoder::new();
         // Whether we want to reset the position in the buffer in the
         // decoder.
         let mut need_reset = false;
@@ -223,33 +261,34 @@ impl<
 
             match decoder.receive(buffer[i]) {
                 Ok(None) => {}
-                Ok(Some(tockloader_proto::Command::Ping)) => {
+                Ok(Some(tock_bootloader_protocol::Command::Ping)) => {
                     self.buffer.replace(buffer);
                     self.send_response(RES_PONG);
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::Reset)) => {
+                Ok(Some(tock_bootloader_protocol::Command::Reset)) => {
                     need_reset = true;
                     // If there are more bytes in the buffer we want to continue
                     // parsing those. Otherwise, we want to go back to receive.
                     if i == rx_len - 1 {
-                        self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                        self.uart
+                            .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                         break;
                     }
                 }
-                Ok(Some(tockloader_proto::Command::Info)) => {
+                Ok(Some(tock_bootloader_protocol::Command::Info)) => {
                     self.state.set(State::Info);
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
                         // Calculate the page index given that flags start
                         // at address 1024.
-                        let page_index = FLAGS_ADDRESS / page.as_mut().len();
+                        let page_index = self.flags_address / page.as_mut().len();
 
-                        self.flash.read_page(page_index, page);
+                        let _ = self.flash.read_page(page_index, page);
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::ReadRange { address, length })) => {
+                Ok(Some(tock_bootloader_protocol::Command::ReadRange { address, length })) => {
                     self.state.set(State::ReadRange {
                         address,
                         length,
@@ -258,11 +297,11 @@ impl<
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
                         let page_size = page.as_mut().len();
-                        self.flash.read_page(address as usize / page_size, page);
+                        let _ = self.flash.read_page(address as usize / page_size, page);
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::WritePage { address, data })) => {
+                Ok(Some(tock_bootloader_protocol::Command::WritePage { address, data })) => {
                     self.page_buffer.take().map(move |page| {
                         let page_size = page.as_mut().len();
                         if page_size != data.len() {
@@ -272,7 +311,18 @@ impl<
                             buffer[1] = RES_BADARGS;
                             self.page_buffer.replace(page);
                             self.state.set(State::Idle);
-                            self.uart.transmit(buffer, 2);
+                            self.uart.transmit_buffer(buffer, 2);
+                        } else if address >= self.bootloader_address
+                            && address < self.bootloader_end_address
+                        {
+                            // Do not allow the bootloader to try to overwrite
+                            // itself. This will largely not work, and would be
+                            // irreversible for the user.
+                            buffer[0] = ESCAPE_CHAR;
+                            buffer[1] = RES_BADADDR;
+                            self.page_buffer.replace(page);
+                            self.state.set(State::Idle);
+                            self.uart.transmit_buffer(buffer, 2);
                         } else {
                             // Otherwise copy into page buffer and write to
                             // flash.
@@ -281,19 +331,19 @@ impl<
                             }
                             self.state.set(State::WriteFlashPage);
                             self.buffer.replace(buffer);
-                            self.flash.write_page(address as usize / page_size, page);
+                            let _ = self.flash.write_page(address as usize / page_size, page);
                         }
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::ErasePage { address })) => {
+                Ok(Some(tock_bootloader_protocol::Command::ErasePage { address })) => {
                     self.state.set(State::ErasePage);
                     self.buffer.replace(buffer);
                     let page_size = self.page_buffer.map_or(512, |page| page.as_mut().len());
-                    self.flash.erase_page(address as usize / page_size);
+                    let _ = self.flash.erase_page(address as usize / page_size);
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::CrcIntFlash { address, length })) => {
+                Ok(Some(tock_bootloader_protocol::Command::CrcIntFlash { address, length })) => {
                     self.state.set(State::Crc {
                         address,
                         remaining_length: length,
@@ -302,11 +352,11 @@ impl<
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
                         let page_size = page.as_mut().len();
-                        self.flash.read_page(address as usize / page_size, page);
+                        let _ = self.flash.read_page(address as usize / page_size, page);
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::GetAttr { index })) => {
+                Ok(Some(tock_bootloader_protocol::Command::GetAttr { index })) => {
                     self.state.set(State::GetAttribute { index: index });
                     self.buffer.replace(buffer);
                     self.page_buffer.take().map(move |page| {
@@ -314,14 +364,14 @@ impl<
                         // correct attribute (each attribute is 64 bytes long),
                         // where attributes start at address 0x600.
                         let page_len = page.as_mut().len();
-                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                        let read_address = self.attributes_address + (index as usize * 64);
                         let page_index = read_address / page_len;
 
-                        self.flash.read_page(page_index, page);
+                        let _ = self.flash.read_page(page_index, page);
                     });
                     break;
                 }
-                Ok(Some(tockloader_proto::Command::SetAttr { index, key, value })) => {
+                Ok(Some(tock_bootloader_protocol::Command::SetAttr { index, key, value })) => {
                     self.state.set(State::SetAttribute { index });
 
                     // Copy the key and value into the buffer so it can be added
@@ -347,11 +397,29 @@ impl<
                         // correct attribute (each attribute is 64 bytes long),
                         // where attributes start at address 0x600.
                         let page_len = page.as_mut().len();
-                        let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                        let read_address = self.attributes_address + (index as usize * 64);
                         let page_index = read_address / page_len;
 
-                        self.flash.read_page(page_index, page);
+                        let _ = self.flash.read_page(page_index, page);
                     });
+                    break;
+                }
+                Ok(Some(tock_bootloader_protocol::Command::SetStartAddress { address })) => {
+                    self.state.set(State::SetStartAddress { address });
+                    self.buffer.replace(buffer);
+
+                    // Initiate things by reading the correct flash page that
+                    // needs to be updated.
+                    self.page_buffer.take().map(move |page| {
+                        let page_len = page.as_mut().len();
+                        let page_index = self.flags_address / page_len;
+
+                        let _ = self.flash.read_page(page_index, page);
+                    });
+                    break;
+                }
+                Ok(Some(tock_bootloader_protocol::Command::Exit)) => {
+                    (self.reset_function)();
                     break;
                 }
                 Ok(Some(_)) => {
@@ -359,7 +427,7 @@ impl<
                     self.send_response(RES_UNKNOWN);
                     break;
                 }
-                Err(tockloader_proto::Error::BadArguments) => {
+                Err(tock_bootloader_protocol::Error::BadArguments) => {
                     self.buffer.replace(buffer);
                     self.send_response(RES_BADARGS);
                     break;
@@ -381,12 +449,8 @@ impl<
     }
 }
 
-impl<
-        'a,
-        U: hil::uart::UARTReceiveAdvanced + 'a,
-        F: hil::flash::Flash + 'a,
-        G: hil::gpio::Pin + 'a,
-    > hil::flash::Client<F> for Bootloader<'a, U, F, G>
+impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::flash::Client<F>
+    for Bootloader<'a, U, F>
 {
     fn read_complete(&self, pagebuffer: &'static mut F::Page, _error: hil::flash::Error) {
         match self.state.get() {
@@ -407,7 +471,7 @@ impl<
                     }
 
                     // Calculate where in the page the flags start.
-                    let page_offset = FLAGS_ADDRESS % pagebuffer.as_mut().len();
+                    let page_offset = self.flags_address % pagebuffer.as_mut().len();
 
                     // Version string is at most 8 bytes long, and starts
                     // at index 14 in the bootloader page.
@@ -420,8 +484,27 @@ impl<
                         index += 1;
                     }
 
+                    // Do start address
+                    let str02 = "\", \"start_address\":\"0x";
+                    for i in 0..str02.len() {
+                        buffer[index] = str02.as_bytes()[i];
+                        index += 1;
+                    }
+                    for i in 0..8 {
+                        let b = (pagebuffer.as_mut()[32 + page_offset + 3 - (i / 2)]
+                            >> (((i + 1) % 2) * 4))
+                            & 0x0F;
+                        buffer[index] = char::from_digit(b.into(), 16).unwrap_or('?') as u8;
+                        index += 1;
+                    }
+                    let str02 = "\", ";
+                    for i in 0..str02.len() {
+                        buffer[index] = str02.as_bytes()[i];
+                        index += 1;
+                    }
+
                     // Insert the last half of the JSON blob into the buffer.
-                    let str02 = "\", \"name\":\"Tock Bootloader\"}";
+                    let str02 = "\"name\":\"Tock Bootloader\"}";
                     for i in 0..str02.len() {
                         buffer[index] = str02.as_bytes()[i];
                         index += 1;
@@ -438,7 +521,7 @@ impl<
                     }
 
                     self.page_buffer.replace(pagebuffer);
-                    self.uart.transmit(buffer, 195);
+                    self.uart.transmit_buffer(buffer, 195);
                 });
             }
 
@@ -455,7 +538,7 @@ impl<
                     // attribute with attributes starting at address 0x600 and
                     // where each has length of 64 bytes.
                     let page_len = pagebuffer.as_mut().len();
-                    let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                    let read_address = self.attributes_address + (index as usize * 64);
                     let page_offset = read_address % page_len;
 
                     for i in 0..64 {
@@ -470,7 +553,7 @@ impl<
                     }
 
                     self.page_buffer.replace(pagebuffer);
-                    self.uart.transmit(buffer, j);
+                    self.uart.transmit_buffer(buffer, j);
                 });
             }
 
@@ -479,7 +562,7 @@ impl<
             State::SetAttribute { index } => {
                 self.buffer.map(move |buffer| {
                     let page_len = pagebuffer.as_mut().len();
-                    let read_address = FIRST_ATTRIBUTE_ADDRESS + (index as usize * 64);
+                    let read_address = self.attributes_address + (index as usize * 64);
                     let page_offset = read_address % page_len;
                     let page_index = read_address / page_len;
 
@@ -488,8 +571,24 @@ impl<
                     for i in 0..64 {
                         pagebuffer.as_mut()[page_offset + i] = buffer[i];
                     }
-                    self.flash.write_page(page_index, pagebuffer);
+                    let _ = self.flash.write_page(page_index, pagebuffer);
                 });
+            }
+
+            // We need to update the page we just read with the new attribute,
+            // and then write that all back to flash.
+            State::SetStartAddress { address } => {
+                let page_len = pagebuffer.as_mut().len();
+                let read_address = self.flags_address + 32;
+                let page_offset = read_address % page_len;
+                let page_index = read_address / page_len;
+
+                // Copy the first 64 bytes of the buffer into the correct
+                // spot in the page.
+                for (i, v) in address.to_le_bytes().iter().enumerate() {
+                    pagebuffer.as_mut()[page_offset + i] = *v;
+                }
+                let _ = self.flash.write_page(page_index, pagebuffer);
             }
 
             // Pass what we have read so far to the client.
@@ -551,7 +650,7 @@ impl<
 
                     // And send the buffer to the client.
                     self.page_buffer.replace(pagebuffer);
-                    self.uart.transmit(buffer, index);
+                    self.uart.transmit_buffer(buffer, index);
                 });
             }
 
@@ -595,7 +694,7 @@ impl<
                         buffer[5] = ((new_crc >> 24) & 0xFF) as u8;
                         // And send the buffer to the client.
                         self.page_buffer.replace(pagebuffer);
-                        self.uart.transmit(buffer, 6);
+                        self.uart.transmit_buffer(buffer, 6);
                     });
                 } else {
                     // More CRC to do!
@@ -604,7 +703,8 @@ impl<
                         remaining_length: new_remaining_length,
                         crc: new_crc,
                     });
-                    self.flash
+                    let _ = self
+                        .flash
                         .read_page(new_address as usize / page_size, pagebuffer);
                 }
             }
@@ -623,7 +723,7 @@ impl<
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_OK;
-                    self.uart.transmit(buffer, 2);
+                    self.uart.transmit_buffer(buffer, 2);
                 });
             }
 
@@ -633,13 +733,24 @@ impl<
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_OK;
-                    self.uart.transmit(buffer, 2);
+                    self.uart.transmit_buffer(buffer, 2);
+                });
+            }
+
+            // Attribute writing done, send an OK response.
+            State::SetStartAddress { address: _ } => {
+                self.state.set(State::Idle);
+                self.buffer.take().map(move |buffer| {
+                    buffer[0] = ESCAPE_CHAR;
+                    buffer[1] = RES_OK;
+                    self.uart.transmit_buffer(buffer, 2);
                 });
             }
 
             _ => {
                 self.buffer.take().map(|buffer| {
-                    self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                    self.uart
+                        .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                 });
             }
         }
@@ -653,13 +764,14 @@ impl<
                 self.buffer.take().map(move |buffer| {
                     buffer[0] = ESCAPE_CHAR;
                     buffer[1] = RES_OK;
-                    self.uart.transmit(buffer, 2);
+                    self.uart.transmit_buffer(buffer, 2);
                 });
             }
 
             _ => {
                 self.buffer.take().map(|buffer| {
-                    self.uart.receive_automatic(buffer, UART_RECEIVE_TIMEOUT);
+                    self.uart
+                        .receive_automatic(buffer, buffer.len(), UART_RECEIVE_TIMEOUT);
                 });
             }
         }

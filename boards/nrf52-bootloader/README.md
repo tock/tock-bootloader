@@ -1,14 +1,13 @@
-Platform-Specific Instructions: nRF52840-DK
-===================================
+nRF52840dk Bootloader
+=====================
 
-The [nRF52840 Development
-Kit](https://www.nordicsemi.com/eng/Products/nRF52840-DK) is a platform
-based around the nRF52840, an SoC with an ARM Cortex-M4 and a BLE
-radio. The kit is Arduino shield compatible and includes several
-buttons.
+This is an experimental version of the Tock bootloader over UART for the nrf52
+series of chips. However, no actual boards ever used this version, since no
+Tock-compatible boards ever used the nRF52 with an FTDI chip.
 
-This is the Tock bootloader for this platform.
+If you would like to use this, however, you can with an older version of the
+bootloader:
 
-```
-make flash
+```shell
+$ git checkout v1.0.1
 ```
