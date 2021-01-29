@@ -201,7 +201,7 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveMultip
                 if rval == ReturnCode::SUCCESS {
                     // Next we setup a timer to timeout if the receive has
                     // finished.
-                    let interval = A::ticks_from_ms(4);
+                    let interval = A::ticks_from_ms(6);
                     self.alarm.set_alarm(self.alarm.now(), interval);
 
                     // Then we go back to receiving to see if there is more data
@@ -209,7 +209,7 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveMultip
                     //
                     // Receive up to half of the buffer at a time so there is
                     // room if the host sends us more than we expect.
-                    self.uart.receive_buffer(buffer, buffer.len() / 2);
+                    self.uart.receive_buffer(buffer, 50);
                 } else if rval == ReturnCode::ECANCEL {
                     // The last receive was aborted meaning the receive has
                     // finished.
