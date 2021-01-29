@@ -200,15 +200,20 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveMultip
                 // If everything is normal then we continue receiving.
                 if rval == ReturnCode::SUCCESS {
                     // Next we setup a timer to timeout if the receive has
-                    // finished.
+                    // finished. Six ms should be enough to receive up to 50
+                    // bytes.
                     let interval = A::ticks_from_ms(6);
                     self.alarm.set_alarm(self.alarm.now(), interval);
 
                     // Then we go back to receiving to see if there is more data
                     // on its way.
                     //
-                    // Receive up to half of the buffer at a time so there is
-                    // room if the host sends us more than we expect.
+                    // Receive either 50 bytes or half the buffer, whatever is
+                    // lower. We only use half the buffer in case the host sends
+                    // us more than we expect, as can happen with USB where we
+                    // don't have a method for flow control. We receive up to 50
+                    // so that we don't need a long timeout in case the host is
+                    // only sending us a small number of bytes.
                     self.uart
                         .receive_buffer(buffer, cmp::min(buffer.len() / 2, 50));
                 } else if rval == ReturnCode::ECANCEL {
