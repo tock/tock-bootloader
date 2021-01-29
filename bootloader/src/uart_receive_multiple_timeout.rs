@@ -209,7 +209,8 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveMultip
                     //
                     // Receive up to half of the buffer at a time so there is
                     // room if the host sends us more than we expect.
-                    self.uart.receive_buffer(buffer, cmp::min (buf.len ()/ 2, 50));
+                    self.uart
+                        .receive_buffer(buffer, cmp::min(buffer.len() / 2, 50));
                 } else if rval == ReturnCode::ECANCEL {
                     // The last receive was aborted meaning the receive has
                     // finished.
