@@ -39,6 +39,7 @@ checksum = "ae44d1a3d5a19df61dd0c8beb138458ac2a53a7ac09eba97d55592540004306b"
 [[package]]
 name = "capsules"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 dependencies = [
  "enum_primitive",
  "kernel",
@@ -47,6 +48,7 @@ dependencies = [
 [[package]]
 name = "components"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 dependencies = [
  "capsules",
  "kernel",
@@ -55,6 +57,7 @@ dependencies = [
 [[package]]
 name = "cortexm"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 dependencies = [
  "kernel",
 ]
@@ -62,6 +65,7 @@ dependencies = [
 [[package]]
 name = "cortexm4"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 dependencies = [
  "cortexm",
  "kernel",
@@ -70,10 +74,12 @@ dependencies = [
 [[package]]
 name = "enum_primitive"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 
 [[package]]
 name = "kernel"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 dependencies = [
  "tock-cells",
  "tock-registers",
@@ -99,6 +105,7 @@ dependencies = [
 [[package]]
 name = "nrf52"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 dependencies = [
  "cortexm4",
  "enum_primitive",
@@ -110,6 +117,7 @@ dependencies = [
 [[package]]
 name = "nrf52833"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 dependencies = [
  "cortexm4",
  "kernel",
@@ -120,6 +128,7 @@ dependencies = [
 [[package]]
 name = "nrf5x"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 dependencies = [
  "enum_primitive",
  "kernel",
@@ -135,15 +144,19 @@ dependencies = [
 [[package]]
 name = "tock-cells"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 
 [[package]]
 name = "tock-registers"
 version = "0.6.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 
 [[package]]
 name = "tock-rt0"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
 
 [[package]]
 name = "tock-tbf"
 version = "0.1.0"
+source = "git+https://github.com/tock/tock?branch=master#af1efe87f3f52f9dc923f0ca936091f7681ce59a"
