@@ -1,0 +1,52 @@
+name: Micro:bit v2 Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+
+jobs:
+  release:
+    runs-on: "ubuntu-latest"
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1 # pulls version from rust-toolchain file
+      - name: build bootloader
+        run: |
+          cd boards/microbit_v2-bootloader
+          export BOOTLOADER_VERSION="${{ github.event.inputs.version }}"
+          export BOOTLOADER_HASH="$(git rev-parse HEAD)"
+          export BOOTLOADER_KERNEL_HASH="$(cat Cargo.lock | grep https://github.com/tock/tock?branch=remove-submodule | uniq | cut -d '#' -f 2 | cut -d '"' -f 1)"
+          make
+      - name: Version
+        run: |
+          echo "Version: ${{ github.event.inputs.version }}" > tock-bootloader.microbit_v2.version
+          echo "Toolchain: $(rustc --version)" >> tock-bootloader.microbit_v2.version
+          echo "Tock Bootloader Hash: $(git rev-parse HEAD)" >> tock-bootloader.microbit_v2.version
+          echo Tock Hash: $(cat boards/microbit_v2-bootloader/Cargo.lock | grep https://github.com/tock/tock?branch=remove-submodule | uniq |  cut -d '#' -f 2 | cut -d '"' -f 1) >> tock-bootloader.microbit_v2.version
+          echo "Bootloader SHA256: $(sha256sum target/thumbv7em-none-eabi/release/microbit_v2-bootloader.bin | cut -d ' ' -f 1)" >> tock-bootloader.microbit_v2.version
+          echo "Build Date: $(date)" >> tock-bootloader.microbit_v2.version
+      - name: Upload bootloader release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          release_name: Micro:bit v2 ${{ github.event.inputs.version }}
+          prerelease: true
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/thumbv7em-none-eabi/release/microbit_v2-bootloader.bin
+          asset_name: tock-bootloader.microbit_v2.v${{ github.event.inputs.version }}.bin
+          tag: microbit_v2-v${{ github.event.inputs.version }}
+          overwrite: true
+          body: "Bootloader for Micro:bit v2 v${{ github.event.inputs.version }}"
+      - name: Upload bootloader version
+        uses: svenstaro/upload-release-action@v2
+        with:
+          release_name: Micro:bit v2 ${{ github.event.inputs.version }}
+          prerelease: true
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: tock-bootloader.microbit_v2.version
+          asset_name: tock-bootloader.microbit_v2.v${{ github.event.inputs.version }}.version
+          tag: microbit_v2-v${{ github.event.inputs.version }}
