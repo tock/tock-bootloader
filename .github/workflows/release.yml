@@ -37,10 +37,10 @@ jobs:
           prerelease: true
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: target/thumbv7em-none-eabi/release/microbit_v2-bootloader.bin
-          asset_name: tock-bootloader.microbit_v2.v${{ github.event.inputs.version }}.bin
-          tag: microbit_v2-v${{ github.event.inputs.version }}
+          asset_name: tock-bootloader.microbit_v2.${{ github.event.inputs.version }}.bin
+          tag: microbit_v2-${{ github.event.inputs.version }}
           overwrite: true
-          body: "Bootloader for Micro:bit v2 v${{ github.event.inputs.version }}"
+          body: "Bootloader for Micro:bit v2 ${{ github.event.inputs.version }}"
       - name: Upload bootloader version
         uses: svenstaro/upload-release-action@v2
         with:
@@ -48,5 +48,5 @@ jobs:
           prerelease: true
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: tock-bootloader.microbit_v2.version
-          asset_name: tock-bootloader.microbit_v2.v${{ github.event.inputs.version }}.version
-          tag: microbit_v2-v${{ github.event.inputs.version }}
+          asset_name: tock-bootloader.microbit_v2.${{ github.event.inputs.version }}.version
+          tag: microbit_v2-${{ github.event.inputs.version }}
