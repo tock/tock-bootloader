@@ -35,7 +35,8 @@ jobs:
           export BOOTLOADER_HASH="$(git rev-parse HEAD)"
           export BOOTLOADER_KERNEL_HASH="$(cat Cargo.lock | grep https://github.com/tock/tock?rev=405417 | uniq | cut -d '#' -f 2 | cut -d '"' -f 1)"
           make
-          elf2uf2 target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.bin target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.uf2
+      - name: build uf2
+        run: elf2uf2 target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.bin target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.uf2
       - name: Version
         run: |
           echo "Version: ${{ github.event.inputs.version }}" > tock-bootloader.clue_nrf52840.version
