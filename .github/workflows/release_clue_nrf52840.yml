@@ -28,15 +28,15 @@ jobs:
           cmake ..
           make
           sudo cp elf2uf2 /usr/local/bin
-      - name: build bootloader
+      - name: Build bootloader
         run: |
           cd boards/clue_nrf52840-bootloader
           export BOOTLOADER_VERSION="${{ github.event.inputs.version }}"
           export BOOTLOADER_HASH="$(git rev-parse HEAD)"
           export BOOTLOADER_KERNEL_HASH="$(cat Cargo.lock | grep https://github.com/tock/tock?rev=405417 | uniq | cut -d '#' -f 2 | cut -d '"' -f 1)"
           make
-      - name: build uf2
-        run: elf2uf2 target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.bin target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.uf2
+      - name: Build uf2
+        run: elf2uf2 target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.elf target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.uf2
       - name: Version
         run: |
           echo "Version: ${{ github.event.inputs.version }}" > tock-bootloader.clue_nrf52840.version

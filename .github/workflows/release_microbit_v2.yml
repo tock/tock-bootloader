@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1 # pulls version from rust-toolchain file
-      - name: build bootloader
+      - name: Build bootloader
         run: |
           cd boards/microbit_v2-bootloader
           export BOOTLOADER_VERSION="${{ github.event.inputs.version }}"
