@@ -1,5 +1,4 @@
 build
 target
 local_cargo
-Cargo.lock
 

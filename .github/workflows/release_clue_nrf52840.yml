@@ -1,0 +1,77 @@
+name: CLUE nRF52840 Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+
+jobs:
+  release:
+    runs-on: "ubuntu-latest"
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1 # pulls version from rust-toolchain file
+      - name: Build elf2uf2
+        run: |
+          apt-get install build-essential cmake
+          cd /tmp
+          git clone https://github.com/raspberrypi/pico-sdk.git
+          cd pico-sdk
+          git checkout tags/1.2.0
+          cd tools/elf2uf2
+          mkdir build
+          cd build
+          cmake ..
+          make
+          cp elf2uf2 /usr/local/bin
+      - name: build bootloader
+        run: |
+          cd boards/clue_nrf52840-bootloader
+          export BOOTLOADER_VERSION="${{ github.event.inputs.version }}"
+          export BOOTLOADER_HASH="$(git rev-parse HEAD)"
+          export BOOTLOADER_KERNEL_HASH="$(cat Cargo.lock | grep https://github.com/tock/tock?rev=405417 | uniq | cut -d '#' -f 2 | cut -d '"' -f 1)"
+          make
+          elf2uf2 target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.bin target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.uf2
+      - name: Version
+        run: |
+          echo "Version: ${{ github.event.inputs.version }}" > tock-bootloader.clue_nrf52840.version
+          echo "Toolchain: $(rustc --version)" >> tock-bootloader.clue_nrf52840.version
+          echo "Tock Bootloader Hash: $(git rev-parse HEAD)" >> tock-bootloader.clue_nrf52840.version
+          echo Tock Hash: $(cat boards/clue_nrf52840-bootloader/Cargo.lock | grep https://github.com/tock/tock?rev=405417 | uniq |  cut -d '#' -f 2 | cut -d '"' -f 1) >> tock-bootloader.clue_nrf52840.version
+          echo "Bootloader SHA256: $(sha256sum target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.bin | cut -d ' ' -f 1)" >> tock-bootloader.clue_nrf52840.version
+          echo "Build Date: $(date)" >> tock-bootloader.clue_nrf52840.version
+      - name: Upload bootloader release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          release_name: CLUE nRF52840 Express ${{ github.event.inputs.version }}
+          prerelease: true
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.bin
+          asset_name: tock-bootloader.clue_nrf52840.${{ github.event.inputs.version }}.bin
+          tag: clue_nrf52840-${{ github.event.inputs.version }}
+          overwrite: true
+          body: "Bootloader for CLUE nRF52840 Express ${{ github.event.inputs.version }}"
+      - name: Upload bootloader uf2
+        uses: svenstaro/upload-release-action@v2
+        with:
+          release_name: CLUE nRF52840 Express ${{ github.event.inputs.version }}
+          prerelease: true
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.uf2
+          asset_name: tock-bootloader.clue_nrf52840.${{ github.event.inputs.version }}.uf2
+          tag: clue_nrf52840-${{ github.event.inputs.version }}
+          overwrite: true
+          body: "Bootloader for CLUE nRF52840 Express ${{ github.event.inputs.version }}"
+      - name: Upload bootloader version
+        uses: svenstaro/upload-release-action@v2
+        with:
+          release_name: CLUE nRF52840 Express ${{ github.event.inputs.version }}
+          prerelease: true
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: tock-bootloader.clue_nrf52840.version
+          asset_name: tock-bootloader.clue_nrf52840.${{ github.event.inputs.version }}.version
+          tag: clue_nrf52840-${{ github.event.inputs.version }}

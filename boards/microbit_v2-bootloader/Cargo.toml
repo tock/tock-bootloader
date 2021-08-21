@@ -6,12 +6,12 @@ build = "build.rs"
 edition = "2018"
 
 [dependencies]
-cortexm4 = { git = "https://github.com/tock/tock", branch = "master" }
-capsules = { git = "https://github.com/tock/tock", branch = "master" }
-kernel = { git = "https://github.com/tock/tock", branch = "master" }
-nrf52 = { git = "https://github.com/tock/tock", branch = "master" }
-nrf52833 = { git = "https://github.com/tock/tock", branch = "master" }
-components = { git = "https://github.com/tock/tock", branch = "master" }
+cortexm4 = { git = "https://github.com/tock/tock", rev = "405417" }
+capsules = { git = "https://github.com/tock/tock", rev = "405417" }
+kernel = { git = "https://github.com/tock/tock", rev = "405417" }
+nrf52 = { git = "https://github.com/tock/tock", rev = "405417" }
+nrf52833 = { git = "https://github.com/tock/tock", rev = "405417" }
+components = { git = "https://github.com/tock/tock", rev = "405417" }
 
 # For Development
 # cortexm4 = { path = "../../../tock/arch/cortex-m4" }

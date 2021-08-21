@@ -47,6 +47,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "clue_nrf52840-bootloader"
+version = "0.1.0"
+dependencies = [
+ "bootloader",
+ "bootloader_attributes",
+ "bootloader_cortexm",
+ "bootloader_nrf52",
+ "capsules",
+ "components",
+ "cortexm4",
+ "kernel",
+ "nrf52",
+ "nrf52840",
+ "nrf52_components",
+]
+
+[[package]]
 name = "components"
 version = "0.1.0"
 source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
@@ -88,22 +105,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "microbit_v2-bootloader"
-version = "0.1.0"
-dependencies = [
- "bootloader",
- "bootloader_attributes",
- "bootloader_cortexm",
- "bootloader_nrf52",
- "capsules",
- "components",
- "cortexm4",
- "kernel",
- "nrf52",
- "nrf52833",
-]
-
-[[package]]
 name = "nrf52"
 version = "0.1.0"
 source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
@@ -116,7 +117,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nrf52833"
+name = "nrf52840"
 version = "0.1.0"
 source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
@@ -124,6 +125,18 @@ dependencies = [
  "kernel",
  "nrf52",
  "tock-rt0",
+]
+
+[[package]]
+name = "nrf52_components"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
+dependencies = [
+ "capsules",
+ "components",
+ "cortexm4",
+ "kernel",
+ "nrf52",
 ]
 
 [[package]]

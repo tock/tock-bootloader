@@ -39,16 +39,17 @@ checksum = "ae44d1a3d5a19df61dd0c8beb138458ac2a53a7ac09eba97d55592540004306b"
 [[package]]
 name = "capsules"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
  "enum_primitive",
  "kernel",
+ "tickv",
 ]
 
 [[package]]
 name = "components"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
  "capsules",
  "kernel",
@@ -57,7 +58,7 @@ dependencies = [
 [[package]]
 name = "cortexm"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
  "kernel",
 ]
@@ -65,7 +66,7 @@ dependencies = [
 [[package]]
 name = "cortexm4"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
  "cortexm",
  "kernel",
@@ -74,15 +75,16 @@ dependencies = [
 [[package]]
 name = "enum_primitive"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 
 [[package]]
 name = "kernel"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
  "tock-cells",
  "tock-registers",
+ "tock-tbf",
 ]
 
 [[package]]
@@ -105,7 +107,7 @@ dependencies = [
 [[package]]
 name = "nrf52"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
  "cortexm4",
  "enum_primitive",
@@ -117,7 +119,7 @@ dependencies = [
 [[package]]
 name = "nrf52840"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
  "cortexm4",
  "kernel",
@@ -128,7 +130,7 @@ dependencies = [
 [[package]]
 name = "nrf52_components"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
  "capsules",
  "components",
@@ -140,11 +142,16 @@ dependencies = [
 [[package]]
 name = "nrf5x"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 dependencies = [
  "enum_primitive",
  "kernel",
 ]
+
+[[package]]
+name = "tickv"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 
 [[package]]
 name = "tock-bootloader-protocol"
@@ -156,14 +163,19 @@ dependencies = [
 [[package]]
 name = "tock-cells"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 
 [[package]]
 name = "tock-registers"
 version = "0.6.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
 
 [[package]]
 name = "tock-rt0"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?branch=master#75cb55f8e50bb12be1f702128bc369e149a9c0c6"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
+
+[[package]]
+name = "tock-tbf"
+version = "0.1.0"
+source = "git+https://github.com/tock/tock?rev=405417#40541741703ddddbc14e7a7ef6fca0fb9f0b7584"
