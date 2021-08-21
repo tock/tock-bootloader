@@ -15,19 +15,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1 # pulls version from rust-toolchain file
-      - name: Build elf2uf2
-        run: |
-          sudo apt-get install -y build-essential cmake
-          cd /tmp
-          git clone https://github.com/raspberrypi/pico-sdk.git
-          cd pico-sdk
-          git checkout tags/1.2.0
-          cd tools/elf2uf2
-          mkdir build
-          cd build
-          cmake ..
-          make
-          sudo cp elf2uf2 /usr/local/bin
+      - name: Install elf2uf2
+        run: cargo install uf2conv
       - name: Build bootloader
         run: |
           cd boards/clue_nrf52840-bootloader
@@ -36,7 +25,7 @@ jobs:
           export BOOTLOADER_KERNEL_HASH="$(cat Cargo.lock | grep https://github.com/tock/tock?rev=405417 | uniq | cut -d '#' -f 2 | cut -d '"' -f 1)"
           make
       - name: Build uf2
-        run: elf2uf2 target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.elf target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.uf2
+        run: uf2conv target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.bin -f 0xADA52840 --base 0x26000 --output target/thumbv7em-none-eabi/release/clue_nrf52840-bootloader.uf2
       - name: Version
         run: |
           echo "Version: ${{ github.event.inputs.version }}" > tock-bootloader.clue_nrf52840.version
