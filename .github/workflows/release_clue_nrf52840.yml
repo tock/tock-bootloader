@@ -17,7 +17,7 @@ jobs:
       - uses: actions-rs/toolchain@v1 # pulls version from rust-toolchain file
       - name: Build elf2uf2
         run: |
-          apt-get install build-essential cmake
+          sudo apt-get install -y build-essential cmake
           cd /tmp
           git clone https://github.com/raspberrypi/pico-sdk.git
           cd pico-sdk
@@ -27,7 +27,7 @@ jobs:
           cd build
           cmake ..
           make
-          cp elf2uf2 /usr/local/bin
+          sudo cp elf2uf2 /usr/local/bin
       - name: build bootloader
         run: |
           cd boards/clue_nrf52840-bootloader
