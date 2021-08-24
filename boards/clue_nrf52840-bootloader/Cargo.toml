@@ -6,22 +6,22 @@ build = "build.rs"
 edition = "2018"
 
 [dependencies]
-# cortexm4 = { git = "https://github.com/tock/tock", branch = "master" }
-# capsules = { git = "https://github.com/tock/tock", branch = "master" }
-# kernel = { git = "https://github.com/tock/tock", branch = "master" }
-# nrf52 = { git = "https://github.com/tock/tock", branch = "master" }
-# nrf52840 = { git = "https://github.com/tock/tock", branch = "master" }
-# components = { git = "https://github.com/tock/tock", branch = "master" }
-# nrf52_components = { git = "https://github.com/tock/tock", branch = "master" }
+cortexm4 = { git = "https://github.com/tock/tock", rev = "405417" }
+capsules = { git = "https://github.com/tock/tock", rev = "405417" }
+kernel = { git = "https://github.com/tock/tock", rev = "405417" }
+nrf52 = { git = "https://github.com/tock/tock", rev = "405417" }
+nrf52840 = { git = "https://github.com/tock/tock", rev = "405417" }
+components = { git = "https://github.com/tock/tock", rev = "405417" }
+nrf52_components = { git = "https://github.com/tock/tock", rev = "405417" }
 
 # For Development
-cortexm4 = { path = "../../../tock/arch/cortex-m4" }
-capsules = { path = "../../../tock/capsules" }
-kernel = { path = "../../../tock/kernel" }
-nrf52 = { path = "../../../tock/chips/nrf52" }
-nrf52840 = { path = "../../../tock/chips/nrf52840" }
-components = { path = "../../../tock/boards/components" }
-nrf52_components = { path = "../../../tock/boards/nordic/nrf52_components" }
+# cortexm4 = { path = "../../../tock/arch/cortex-m4" }
+# capsules = { path = "../../../tock/capsules" }
+# kernel = { path = "../../../tock/kernel" }
+# nrf52 = { path = "../../../tock/chips/nrf52" }
+# nrf52840 = { path = "../../../tock/chips/nrf52840" }
+# components = { path = "../../../tock/boards/components" }
+# nrf52_components = { path = "../../../tock/boards/nordic/nrf52_components" }
 
 bootloader = { path = "../../bootloader" }
 bootloader_nrf52 = { path = "../../chips/bootloader_nrf52" }

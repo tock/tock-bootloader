@@ -117,7 +117,7 @@ pub unsafe fn reset_handler() {
 
     let active_notifier_led = static_init!(
         kernel::hil::led::LedHigh<'static, nrf52840::gpio::GPIOPin>,
-        kernel::hil::led::LedHigh::new(&base_peripherals.gpio_port[LED_ON_PIN])
+        kernel::hil::led::LedHigh::new(&nrf52840_peripherals.gpio_port[LED_ON_PIN])
     );
 
     let bootloader_active_notifier = static_init!(
@@ -387,7 +387,13 @@ pub unsafe fn reset_handler() {
 
     let scheduler = components::sched::round_robin::RoundRobinComponent::new(&PROCESSES)
         .finalize(components::rr_component_helper!(NUM_PROCS));
-    board_kernel.kernel_loop(&platform, chip, None, scheduler, &main_loop_capability);
+    board_kernel.kernel_loop::<_, _, _, NUM_PROCS>(
+        &platform,
+        chip,
+        None,
+        scheduler,
+        &main_loop_capability,
+    );
 }
 
 #[cfg(not(test))]

@@ -15,19 +15,19 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1 # pulls version from rust-toolchain file
-      - name: build bootloader
+      - name: Build bootloader
         run: |
           cd boards/microbit_v2-bootloader
           export BOOTLOADER_VERSION="${{ github.event.inputs.version }}"
           export BOOTLOADER_HASH="$(git rev-parse HEAD)"
-          export BOOTLOADER_KERNEL_HASH="$(cat Cargo.lock | grep https://github.com/tock/tock?branch=remove-submodule | uniq | cut -d '#' -f 2 | cut -d '"' -f 1)"
+          export BOOTLOADER_KERNEL_HASH="$(cat Cargo.lock | grep https://github.com/tock/tock?branch=rev=405417 | uniq | cut -d '#' -f 2 | cut -d '"' -f 1)"
           make
       - name: Version
         run: |
           echo "Version: ${{ github.event.inputs.version }}" > tock-bootloader.microbit_v2.version
           echo "Toolchain: $(rustc --version)" >> tock-bootloader.microbit_v2.version
           echo "Tock Bootloader Hash: $(git rev-parse HEAD)" >> tock-bootloader.microbit_v2.version
-          echo Tock Hash: $(cat boards/microbit_v2-bootloader/Cargo.lock | grep https://github.com/tock/tock?branch=remove-submodule | uniq |  cut -d '#' -f 2 | cut -d '"' -f 1) >> tock-bootloader.microbit_v2.version
+          echo Tock Hash: $(cat boards/microbit_v2-bootloader/Cargo.lock | grep https://github.com/tock/tock?branch=rev=405417 | uniq |  cut -d '#' -f 2 | cut -d '"' -f 1) >> tock-bootloader.microbit_v2.version
           echo "Bootloader SHA256: $(sha256sum target/thumbv7em-none-eabi/release/microbit_v2-bootloader.bin | cut -d ' ' -f 1)" >> tock-bootloader.microbit_v2.version
           echo "Build Date: $(date)" >> tock-bootloader.microbit_v2.version
       - name: Upload bootloader release
