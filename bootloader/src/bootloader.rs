@@ -2,14 +2,15 @@
 
 use core::cell::Cell;
 use core::cmp;
+use kernel::ErrorCode;
 
-use kernel::common::cells::TakeCell;
-use kernel::common::cells::VolatileCell;
-use kernel::common::StaticRef;
 use kernel::hil;
+use kernel::utilities::cells::TakeCell;
+use kernel::utilities::cells::VolatileCell;
+use kernel::utilities::StaticRef;
 
-use bootloader_crc;
-use interfaces;
+use crate::bootloader_crc;
+use crate::interfaces;
 
 // Main buffer that commands are received into and sent from.
 // Need a buffer big enough for 512 byte pages.
@@ -188,9 +189,9 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
         &self,
         buffer: &'static mut [u8],
         _tx_len: usize,
-        error: kernel::ReturnCode,
+        error: Result<(), ErrorCode>,
     ) {
-        if error != kernel::ReturnCode::SUCCESS {
+        if error.is_err() {
             // self.led.clear();
         } else {
             match self.state.get() {
@@ -232,10 +233,10 @@ impl<'a, U: hil::uart::UartAdvanced<'a> + 'a, F: hil::flash::Flash + 'a> hil::ua
         &self,
         buffer: &'static mut [u8],
         rx_len: usize,
-        rval: kernel::ReturnCode,
+        rval: Result<(), ErrorCode>,
         _error: hil::uart::Error,
     ) {
-        if rval != kernel::ReturnCode::SUCCESS {
+        if rval.is_err() {
             return;
         }
 

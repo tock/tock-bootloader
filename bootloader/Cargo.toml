@@ -2,9 +2,10 @@
 name = "bootloader"
 version = "0.1.0"
 authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
+edition = "2021"
 
 [dependencies]
-kernel = { git = "https://github.com/tock/tock", rev = "405417" }
+kernel = { git = "https://github.com/tock/tock", rev = "c56c68824" }
 #kernel = { path = "../../tock/kernel" }
 
 tock-bootloader-protocol = { path = "../protocol" }

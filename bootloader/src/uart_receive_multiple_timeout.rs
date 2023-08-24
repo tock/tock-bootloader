@@ -13,11 +13,12 @@
 
 use core::cell::Cell;
 use core::cmp;
+use kernel::hil::time::ConvertTicks;
 
-use kernel::common::cells::OptionalCell;
-use kernel::common::cells::TakeCell;
 use kernel::hil;
-use kernel::ReturnCode;
+use kernel::utilities::cells::OptionalCell;
+use kernel::utilities::cells::TakeCell;
+use kernel::ErrorCode;
 
 pub static mut BUF: [u8; 512] = [0; 512];
 
@@ -58,7 +59,7 @@ impl<'a, A: hil::time::Alarm<'a>> UartReceiveMultipleTimeout<'a, A> {
 }
 
 impl<'a, A: hil::time::Alarm<'a>> hil::uart::Configure for UartReceiveMultipleTimeout<'a, A> {
-    fn configure(&self, params: hil::uart::Parameters) -> ReturnCode {
+    fn configure(&self, params: hil::uart::Parameters) -> Result<(), ErrorCode> {
         self.uart.configure(params)
     }
 }
@@ -72,15 +73,15 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::Receive<'a> for UartReceiveMultiple
         &self,
         rx_buffer: &'static mut [u8],
         rx_len: usize,
-    ) -> (ReturnCode, Option<&'static mut [u8]>) {
+    ) -> Result<(), (ErrorCode, &'static mut [u8])> {
         self.uart.receive_buffer(rx_buffer, rx_len)
     }
 
-    fn receive_word(&self) -> ReturnCode {
+    fn receive_word(&self) -> Result<(), ErrorCode> {
         self.uart.receive_word()
     }
 
-    fn receive_abort(&self) -> ReturnCode {
+    fn receive_abort(&self) -> Result<(), ErrorCode> {
         self.uart.receive_abort()
     }
 }
@@ -92,15 +93,15 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::Transmit<'a> for UartReceiveMultipl
         &self,
         tx_buffer: &'static mut [u8],
         tx_len: usize,
-    ) -> (ReturnCode, Option<&'static mut [u8]>) {
+    ) -> Result<(), (ErrorCode, &'static mut [u8])> {
         self.uart.transmit_buffer(tx_buffer, tx_len)
     }
 
-    fn transmit_word(&self, word: u32) -> ReturnCode {
+    fn transmit_word(&self, word: u32) -> Result<(), ErrorCode> {
         self.uart.transmit_word(word)
     }
 
-    fn transmit_abort(&self) -> ReturnCode {
+    fn transmit_abort(&self) -> Result<(), ErrorCode> {
         self.uart.transmit_abort()
     }
 }
@@ -113,7 +114,7 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveAdvanced<'a>
         rx_buffer: &'static mut [u8],
         _rx_len: usize,
         _interbyte_timeout: u8,
-    ) -> (ReturnCode, Option<&'static mut [u8]>) {
+    ) -> Result<(), (ErrorCode, &'static mut [u8])> {
         match self.state.get() {
             State::Idle => {
                 // Nothing is happening with receive right now. So, all we do
@@ -132,35 +133,36 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveAdvanced<'a>
                     .take()
                     .map(|rx| self.uart.receive_buffer(rx, 1));
 
-                (ReturnCode::SUCCESS, None)
+                Ok(())
             }
 
             State::Receiving => {
                 // We are in the middle of a receive. We cannot start another
                 // receive at this point.
-                (ReturnCode::EBUSY, Some(rx_buffer))
+                Err((ErrorCode::BUSY, rx_buffer))
             }
         }
     }
-}
-
-impl<'a, A: hil::time::Alarm<'a>> hil::uart::UartAdvanced<'a>
-    for UartReceiveMultipleTimeout<'a, A>
-{
 }
 
 impl<'a, A: hil::time::Alarm<'a>> hil::time::AlarmClient for UartReceiveMultipleTimeout<'a, A> {
     /// If the timer actually fires then we stopped receiving bytes.
     fn alarm(&self) {
         // Cancel the receive so that we get the buffer back.
-        self.uart.receive_abort();
+        let _ = self.uart.receive_abort();
     }
 }
 
 // Callbacks from the underlying UART driver.
 impl<'a, A: hil::time::Alarm<'a>> hil::uart::TransmitClient for UartReceiveMultipleTimeout<'a, A> {
     // Called when the UART TX has finished.
-    fn transmitted_buffer(&self, _buffer: &'static mut [u8], _tx_len: usize, _rval: ReturnCode) {}
+    fn transmitted_buffer(
+        &self,
+        _buffer: &'static mut [u8],
+        _tx_len: usize,
+        _rval: Result<(), ErrorCode>,
+    ) {
+    }
 }
 
 // Callbacks from the underlying UART driver.
@@ -170,7 +172,7 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveMultip
         &self,
         buffer: &'static mut [u8],
         rx_len: usize,
-        rval: ReturnCode,
+        rval: Result<(), ErrorCode>,
         _error: hil::uart::Error,
     ) {
         match self.state.get() {
@@ -198,45 +200,50 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveMultip
                 });
 
                 // If everything is normal then we continue receiving.
-                if rval == ReturnCode::SUCCESS {
-                    // Next we setup a timer to timeout if the receive has
-                    // finished. Six ms should be enough to receive up to 50
-                    // bytes.
-                    let interval = A::ticks_from_ms(6);
-                    self.alarm.set_alarm(self.alarm.now(), interval);
+                match rval {
+                    Ok(()) => {
+                        // Next we setup a timer to timeout if the receive has
+                        // finished. Six ms should be enough to receive up to 50
+                        // bytes.
+                        let interval = self.alarm.ticks_from_ms(6);
+                        self.alarm.set_alarm(self.alarm.now(), interval);
 
-                    // Then we go back to receiving to see if there is more data
-                    // on its way.
-                    //
-                    // Receive either 50 bytes or half the buffer, whatever is
-                    // lower. We only use half the buffer in case the host sends
-                    // us more than we expect, as can happen with USB where we
-                    // don't have a method for flow control. We receive up to 50
-                    // so that we don't need a long timeout in case the host is
-                    // only sending us a small number of bytes.
-                    self.uart
-                        .receive_buffer(buffer, cmp::min(buffer.len() / 2, 50));
-                } else if rval == ReturnCode::ECANCEL {
-                    // The last receive was aborted meaning the receive has
-                    // finished.
+                        // Then we go back to receiving to see if there is more data
+                        // on its way.
+                        //
+                        // Receive either 50 bytes or half the buffer, whatever is
+                        // lower. We only use half the buffer in case the host sends
+                        // us more than we expect, as can happen with USB where we
+                        // don't have a method for flow control. We receive up to 50
+                        // so that we don't need a long timeout in case the host is
+                        // only sending us a small number of bytes.
+                        let _ = self
+                            .uart
+                            .receive_buffer(buffer, cmp::min(buffer.len() / 2, 50));
+                    }
+                    Err(ErrorCode::CANCEL) => {
+                        // The last receive was aborted meaning the receive has
+                        // finished.
 
-                    // Replace our buffer.
-                    self.rx_buffer.replace(buffer);
+                        // Replace our buffer.
+                        self.rx_buffer.replace(buffer);
 
-                    // We are no longer receiving.
-                    self.state.set(State::Idle);
+                        // We are no longer receiving.
+                        self.state.set(State::Idle);
 
-                    // Call receive complete to the client.
-                    self.rx_client.map(|client| {
-                        self.rx_client_buffer.take().map(|rx_buffer| {
-                            client.received_buffer(
-                                rx_buffer,
-                                self.rx_client_index.get(),
-                                ReturnCode::SUCCESS,
-                                hil::uart::Error::None,
-                            );
+                        // Call receive complete to the client.
+                        self.rx_client.map(|client| {
+                            self.rx_client_buffer.take().map(|rx_buffer| {
+                                client.received_buffer(
+                                    rx_buffer,
+                                    self.rx_client_index.get(),
+                                    Ok(()),
+                                    hil::uart::Error::None,
+                                );
+                            });
                         });
-                    });
+                    }
+                    _ => {}
                 }
             }
         }

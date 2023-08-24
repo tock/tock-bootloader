@@ -1,3 +1,7 @@
+# Licensed under the Apache License, Version 2.0 or the MIT License.
+# SPDX-License-Identifier: Apache-2.0 OR MIT
+# Copyright Tock Contributors 2022.
+
 # Force the Shell to be bash as some systems have strange default shells
 SHELL := bash
 
@@ -13,48 +17,89 @@ MAKEFILE_COMMON_PATH := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 # This is currently the parent directory of MAKEFILE_COMMON_PATH.
 TOCK_ROOT_DIRECTORY := $(dir $(abspath $(MAKEFILE_COMMON_PATH)))
 
-# Common defaults that specific boards can override, but likely do not need to.
-TOOLCHAIN ?= llvm
-CARGO     ?= cargo
-RUSTUP    ?= rustup
+# The path to the root of the rust installation used for this build.
+# Useful for remapping paths and for finding already-installed llvm tools.
+RUSTC_SYSROOT := "$(shell rustc --print sysroot)"
 
-# Default location of target directory (relative to board makefile)
-# passed to cargo --target_dir
+# Common defaults that specific boards can override, but likely do not need to.
+#
+# The TOOLCHAIN parameter is set to the magic value "llvm-tools", which will
+# cause the Makefile to resolve the llvm toolchain installed as part of the
+# rustup component "llvm-tools". In case a system toolchain shall be used, this
+# can be overridden to specify the toolchain prefix, e.g. "llvm" for
+# llvm-{objdump,objcopy,...} or "arm-none-eabi".
+TOOLCHAIN ?= llvm-tools
+CARGO     ?= cargo
+
+# Not all platforms support the rustup tool. Those that do not can pass
+# `NO_RUSTUP=1` to make and then all of the rustup commands will be ignored.
+ifeq ($(NO_RUSTUP),)
+  RUSTUP ?= rustup
+else
+  RUSTUP ?= true
+endif
+
+# Default location of target directory (relative to board makefile) passed to
+# cargo `--target_dir`.
 TARGET_DIRECTORY ?= $(TOCK_ROOT_DIRECTORY)target/
 
 # RUSTC_FLAGS allows boards to define board-specific options.
 # This will hopefully move into Cargo.toml (or Cargo.toml.local) eventually.
-# lld uses the page size to align program sections. It defaults to 4096 and this
-# puts a gap between before the .relocate section. `zmax-page-size=512` tells
-# lld the actual page size so it doesn't have to be conservative.
+#
+# - `-Tlayout.ld`: Use the linker script `layout.ld` all boards must provide.
+# - `linker=rust-lld`: Tell rustc to use the LLVM linker. This avoids needing
+#   GCC as a dependency to build the kernel.
+# - `linker-flavor=ld.lld`: Use the LLVM lld executable with the `-flavor gnu`
+#   flag.
+# - `relocation-model=static`: See https://github.com/tock/tock/pull/2853
+# - `-nmagic`: lld by default uses a default page size to align program
+#   sections. Tock expects that program sections are set back-to-back. `-nmagic`
+#   instructs the linker to not page-align sections.
+# - `-icf=all`: Identical Code Folding (ICF) set to all. This tells the linker
+#   to be more aggressive about removing duplicate code. The default is `safe`,
+#   and the downside to `all` is that different functions in the code can end up
+#   with the same address in the binary. However, it can save a fair bit of code
+#   size.
+# - `-C symbol-mangling-version=v0`: Opt-in to Rust v0 symbol mangling scheme.
+#   See https://github.com/rust-lang/rust/issues/60705 and
+#   https://github.com/tock/tock/issues/3529.
 RUSTC_FLAGS ?= \
   -C link-arg=-Tlayout.ld \
   -C linker=rust-lld \
   -C linker-flavor=ld.lld \
-  -C relocation-model=dynamic-no-pic \
-  -C link-arg=-zmax-page-size=512 \
+  -C relocation-model=static \
+  -C link-arg=-nmagic \
   -C link-arg=-icf=all \
+  -C symbol-mangling-version=v0 \
 
 # RISC-V-specific flags.
 ifneq ($(findstring riscv32i, $(TARGET)),)
-  # NOTE: This flag causes kernel panics on some ARM cores. Since the
-  # size benefit is almost exclusively for RISC-V, we only apply it for
-  # those targets.
+  # NOTE: This flag causes kernel panics on some ARM cores. Since the size
+  # benefit is almost exclusively for RISC-V, we only apply it for those
+  # targets.
   RUSTC_FLAGS += -C force-frame-pointers=no
+  # Ensure relocations generated is eligible for linker relaxation.
+  # This provide huge space savings.
+  RUSTC_FLAGS += -C target-feature=+relax
 endif
 
-# RUSTC_FLAGS_TOCK by default extends RUSTC_FLAGS with options
-# that are global to all Tock boards.
+# RUSTC_FLAGS_TOCK by default extends RUSTC_FLAGS with options that are global
+# to all Tock boards.
 #
 # We use `remap-path-prefix` to remove user-specific filepath strings for error
-# reporting from appearing in the generated binary.
+# reporting from appearing in the generated binary. The first line is used for
+# remapping the tock directory, and the second line is for remapping paths to
+# the source code of the core library, which end up in the binary as a result of
+# our use of `-Zbuild-std=core`.
 RUSTC_FLAGS_TOCK ?= \
   $(RUSTC_FLAGS) \
   --remap-path-prefix=$(TOCK_ROOT_DIRECTORY)= \
+  --remap-path-prefix=$(RUSTC_SYSROOT)/lib/rustlib/src/rust/library/core=/core/
 
-# Disallow warnings for continuous integration builds. Disallowing them here
-# ensures that warnings during testing won't prevent compilation from succeeding.
-ifeq ($(CI),true)
+# Disallow warnings only for continuous integration builds. Disallowing them
+# here using the `RUSTC_FLAGS_TOCK` variable ensures that warnings during
+# testing won't prevent compilation from succeeding.
+ifeq ($(NOWARNINGS),true)
   RUSTC_FLAGS_TOCK += -D warnings
 endif
 
@@ -85,31 +130,53 @@ RUSTC_FLAGS_FOR_BIN ?= \
 check_defined = $(strip $(foreach 1,$1,$(if $(value $1),,$(error Undefined variable "$1"))))
 
 # Check that we know the basics of what we are compiling for.
-# `PLATFORM`: The name of the board that the kernel is being compiled for.
-# `TARGET`  : The Rust target architecture the kernel is being compiled for.
+# - `PLATFORM`: The name of the board that the kernel is being compiled for.
+# - `TARGET`  : The Rust target architecture the kernel is being compiled for.
 $(call check_defined, PLATFORM)
 $(call check_defined, TARGET)
 
-# Location of target-specific build
+# Location of target-specific build.
 TARGET_PATH := $(TARGET_DIRECTORY)$(TARGET)
 
-# If environment variable V is non-empty, be verbose.
+# If environment variable V or VERBOSE is non-empty, be verbose.
 ifneq ($(V),)
+  VERBOSE_MODE = 1
+else ifneq ($(VERBOSE),)
+  VERBOSE_MODE = 1
+else
+  VERBOSE_MODE =
+endif
+
+ifeq ($(VERBOSE_MODE),1)
   Q =
-  VERBOSE = --verbose
+  VERBOSE_FLAGS = --verbose
+  DEVNULL =
 else
   Q = @
-  VERBOSE =
+  VERBOSE_FLAGS =
+  DEVNULL = > /dev/null
 endif
 
 # Ask git what version of the Tock kernel we are compiling, so we can include
 # this within the binary. If Tock is not within a git repo then we fallback to
 # a set string which should be updated with every release.
-export TOCK_KERNEL_VERSION := $(shell git describe --tags --always 2> /dev/null || echo "1.4+")
+export TOCK_KERNEL_VERSION := $(shell git describe --tags --always 2> /dev/null || echo "2.1+")
+
+# Allow users to opt out of using rustup.
+ifeq ($(NO_RUSTUP),)
+# Validate that rustup exists.
+RUSTUP_ERROR := $(shell $(RUSTUP) --version > /dev/null 2>&1; echo $$?)
+ifneq ($(RUSTUP_ERROR),0)
+  $(info Error! rustup not found.)
+  $(info Please follow the instructions at https://rustup.rs/ to install rustup.)
+  $(info Alternatively, install all required tools and Rust targets and set NO_RUSTUP=1 to disable this check.)
+  $(info )
+  $(error Rustup required to build Tock.)
+endif
 
 # Validate that rustup is new enough.
-MINIMUM_RUSTUP_VERSION := 1.11.0
-RUSTUP_VERSION := $(strip $(word 2, $(shell $(RUSTUP) --version)))
+MINIMUM_RUSTUP_VERSION := 1.23.0
+RUSTUP_VERSION := $(strip $(word 2, $(shell $(RUSTUP) --version 2> /dev/null)))
 ifeq ($(shell $(TOCK_ROOT_DIRECTORY)tools/semver.sh $(RUSTUP_VERSION) \< $(MINIMUM_RUSTUP_VERSION)), true)
   $(warning Required tool `$(RUSTUP)` is out-of-date.)
   $(warning Running `$(RUSTUP) update` in 3 seconds (ctrl-c to cancel))
@@ -120,46 +187,63 @@ endif
 # Verify that various required Rust components are installed. All of these steps
 # only have to be done once per Rust version, but will take some time when
 # compiling for the first time.
-LLVM_TOOLS_INSTALLED := $(shell $(RUSTUP) component list | grep 'llvm-tools-preview.*(installed)' > /dev/null; echo $$?)
-ifeq ($(LLVM_TOOLS_INSTALLED),1)
-  $(shell $(RUSTUP) component add llvm-tools-preview)
-endif
-ifneq ($(shell $(RUSTUP) component list | grep rust-src),rust-src (installed))
-  $(shell $(RUSTUP) component add rust-src)
-endif
 ifneq ($(shell $(RUSTUP) target list | grep "$(TARGET) (installed)"),$(TARGET) (installed))
-  $(shell $(RUSTUP) target add $(TARGET))
+  $(warning Request to compile for a missing TARGET, make will install in 5s)
+  $(warning Consider updating 'targets' in 'rust-toolchain.toml')
+  $(shell sleep 5s && $(RUSTUP) target add $(TARGET))
+endif
+endif # $(NO_RUSTUP)
+
+# If the user is using the standard toolchain provided as part of the llvm-tools
+# rustup component we need to get the full path. rustup should take care of this
+# for us by putting in a proxy in .cargo/bin, but until that is setup we
+# workaround it.
+ifeq ($(TOOLCHAIN),llvm-tools)
+  TOOLCHAIN = "$(shell dirname $(shell find $(RUSTC_SYSROOT) -name llvm-size))/llvm"
 endif
 
-# If the user is using the standard toolchain we need to get the full path.
-# rustup should take care of this for us by putting in a proxy in .cargo/bin,
-# but until that is setup we workaround it.
-ifeq ($(TOOLCHAIN),llvm)
-  TOOLCHAIN = "$(shell dirname $(shell find `rustc --print sysroot` -name llvm-size))/llvm"
-endif
-
-# Set variables of the key tools we need to compile a Tock kernel.
-SIZE      ?= $(TOOLCHAIN)-size
-OBJCOPY   ?= $(TOOLCHAIN)-objcopy
-OBJDUMP   ?= $(TOOLCHAIN)-objdump
+# Set variables of the key tools we need to compile a Tock kernel. Need to do
+# this after we handle if we are using the LLVM tools or not.
+SIZE    ?= $(TOOLCHAIN)-size
+OBJCOPY ?= $(TOOLCHAIN)-objcopy
+OBJDUMP ?= $(TOOLCHAIN)-objdump
 
 # Set additional flags to produce binary from .elf.
-# * --strip-sections prevents enormous binaries when SRAM is below flash.
-# * --remove-section .apps prevents the .apps section from being included in the
-#   kernel binary file. This section is a placeholder for optionally including
-#   application binaries, and only needs to exist in the .elf. By removing it,
-#   we prevent the kernel binary from overwriting applications.
-OBJCOPY_FLAGS ?= --strip-sections -S --remove-section .apps
+#
+# - `--strip-sections`: Prevents enormous binaries when SRAM is below flash.
+# - `--strip-all`: Remove non-allocated sections outside segments.
+#   `.gnu.warning*` and `.ARM.attribute` sections are not removed.
+# - `--remove-section .apps`: Prevents the .apps section from being included in
+#   the kernel binary file. This section is a placeholder for optionally
+#   including application binaries, and only needs to exist in the .elf. By
+#   removing it, we prevent the kernel binary from overwriting applications.
+OBJCOPY_FLAGS ?= --strip-sections --strip-all --remove-section .apps
+
 # This make variable allows board-specific Makefiles to pass down options to
 # the Cargo build command. For example, in boards/<custom_board>/Makefile:
 # `CARGO_FLAGS += --features=foo` would pass feature `foo` to the top level
 # Cargo.toml.
 CARGO_FLAGS ?=
-# Add default flags to cargo. Boards can add additional options in CARGO_FLAGS
-CARGO_FLAGS_TOCK ?= $(VERBOSE) --target=$(TARGET) --package $(PLATFORM) --target-dir=$(TARGET_DIRECTORY) $(CARGO_FLAGS)
+
+# Add default flags to cargo. Boards can add additional options in
+# `CARGO_FLAGS`.
+#
+# - `-Z build-std=core,compiler_builtins`: Build the std library from source
+#   using our optimization settings. This leads to significantly smaller binary
+#   sizes, and makes debugging easier since debug information for the core
+#   library is included in the resulting .elf file. See
+#   https://github.com/tock/tock/pull/2847 for more details.
+CARGO_FLAGS_TOCK ?= \
+  $(VERBOSE_FLAGS) \
+  -Z build-std=core,compiler_builtins \
+  --target=$(TARGET) \
+  --package $(PLATFORM) \
+  --target-dir=$(TARGET_DIRECTORY) $(CARGO_FLAGS)
+
 # Set the default flags we need for objdump to get a .lst file.
 OBJDUMP_FLAGS ?= --disassemble-all --source --section-headers --demangle
-# Set default flags for size
+
+# Set default flags for size.
 SIZE_FLAGS ?=
 
 # Need an extra flag for OBJDUMP if we are on a thumb platform.
@@ -167,49 +251,74 @@ ifneq (,$(findstring thumb,$(TARGET)))
   OBJDUMP_FLAGS += --arch-name=thumb
 endif
 
-# Check whether the system already has a sha256sum application
-# present, if not use the custom shipped one
+# Additional flags that can be passed to cargo bloat via an environment
+# variable. Allows users to pass arbitrary flags supported by cargo bloat to
+# customize the output. By default, pass an empty string.
+CARGO_BLOAT_FLAGS ?=
+
+# Additional flags that can be passed to print_tock_memory_usage.py via an
+# environment variable. By default, pass an empty string.
+PTMU_ARGS ?=
+
+# `cargo bloat` does not support `-Z build-std`, so we must remove it from cargo
+# flags. See https://github.com/RazrFalcon/cargo-bloat/issues/62.
+CARGO_FLAGS_TOCK_NO_BUILD_STD := $(filter-out -Z build-std=core,$(CARGO_FLAGS_TOCK))
+
+# Check whether the system already has a sha256sum application present. If not,
+# use the custom shipped one.
 ifeq (, $(shell sha256sum --version 2>/dev/null))
-  # No system sha256sum available
+  # No system sha256sum available.
   SHA256SUM := $(CARGO) run --manifest-path $(TOCK_ROOT_DIRECTORY)tools/sha256sum/Cargo.toml -- 2>/dev/null
 else
-  # Use system sha256sum
+  # Use system sha256sum.
   SHA256SUM := sha256sum
 endif
 
+# virtual-function-elimination reduces the size of binaries, but is still
+# experimental and has some possible miscompilation issues. This is only enabled
+# for some boards by default, but is exposed via the `VFUNC_ELIM=1` option.
+#
+# For details on virtual-function-elimination see: https://github.com/rust-lang/rust/pull/96285
+# See https://github.com/rust-lang/rust/issues/68262 for general tracking
+ifneq ($(VFUNC_ELIM),)
+	RUSTC_FLAGS += -C lto -Z virtual-function-elimination
+endif
+
 # Dump configuration for verbose builds
-ifneq ($(V),)
+ifeq ($(VERBOSE_MODE),1)
   $(info )
   $(info *******************************************************)
   $(info TOCK KERNEL BUILD SYSTEM -- VERBOSE BUILD CONFIGURATION)
   $(info *******************************************************)
-  $(info MAKEFILE_COMMON_PATH = $(MAKEFILE_COMMON_PATH))
-  $(info TOCK_ROOT_DIRECTORY  = $(TOCK_ROOT_DIRECTORY))
-  $(info TARGET_DIRECTORY     = $(TARGET_DIRECTORY))
+  $(info MAKEFILE_COMMON_PATH          = $(MAKEFILE_COMMON_PATH))
+  $(info TOCK_ROOT_DIRECTORY           = $(TOCK_ROOT_DIRECTORY))
+  $(info TARGET_DIRECTORY              = $(TARGET_DIRECTORY))
   $(info )
-  $(info PLATFORM             = $(PLATFORM))
-  $(info TARGET               = $(TARGET))
-  $(info TOCK_KERNEL_VERSION  = $(TOCK_KERNEL_VERSION))
-  $(info RUSTC_FLAGS          = $(RUSTC_FLAGS))
-  $(info RUSTC_FLAGS_TOCK     = $(RUSTC_FLAGS_TOCK))
-  $(info MAKEFLAGS            = $(MAKEFLAGS))
-  $(info OBJDUMP_FLAGS        = $(OBJDUMP_FLAGS))
-  $(info OBJCOPY_FLAGS        = $(OBJCOPY_FLAGS))
-  $(info CARGO_FLAGS          = $(CARGO_FLAGS))
-  $(info CARGO_FLAGS_TOCK     = $(CARGO_FLAGS_TOCK))
-  $(info SIZE_FLAGS           = $(SIZE_FLAGS))
+  $(info PLATFORM                      = $(PLATFORM))
+  $(info TARGET                        = $(TARGET))
+  $(info TOCK_KERNEL_VERSION           = $(TOCK_KERNEL_VERSION))
+  $(info RUSTC_FLAGS                   = $(RUSTC_FLAGS))
+  $(info RUSTC_FLAGS_TOCK              = $(RUSTC_FLAGS_TOCK))
+  $(info MAKEFLAGS                     = $(MAKEFLAGS))
+  $(info OBJDUMP_FLAGS                 = $(OBJDUMP_FLAGS))
+  $(info OBJCOPY_FLAGS                 = $(OBJCOPY_FLAGS))
+  $(info CARGO_FLAGS                   = $(CARGO_FLAGS))
+  $(info CARGO_FLAGS_TOCK              = $(CARGO_FLAGS_TOCK))
+  $(info CARGO_FLAGS_TOCK_NO_BUILD_STD = $(CARGO_FLAGS_TOCK_NO_BUILD_STD))
+  $(info SIZE_FLAGS                    = $(SIZE_FLAGS))
+  $(info CARGO_BLOAT_FLAGS             = $(CARGO_BLOAT_FLAGS))
   $(info )
-  $(info TOOLCHAIN            = $(TOOLCHAIN))
-  $(info SIZE                 = $(SIZE))
-  $(info OBJCOPY              = $(OBJCOPY))
-  $(info OBJDUMP              = $(OBJDUMP))
-  $(info CARGO                = $(CARGO))
-  $(info RUSTUP               = $(RUSTUP))
-  $(info SHA256SUM            = $(SHA256SUM))
+  $(info TOOLCHAIN                     = $(TOOLCHAIN))
+  $(info SIZE                          = $(SIZE))
+  $(info OBJCOPY                       = $(OBJCOPY))
+  $(info OBJDUMP                       = $(OBJDUMP))
+  $(info CARGO                         = $(CARGO))
+  $(info RUSTUP                        = $(RUSTUP))
+  $(info SHA256SUM                     = $(SHA256SUM))
   $(info )
-  $(info cargo --version      = $(shell $(CARGO) --version))
-  $(info rustc --version      = $(shell rustc --version))
-  $(info rustup --version     = $(shell $(RUSTUP) --version))
+  $(info cargo --version               = $(shell $(CARGO) --version))
+  $(info rustc --version               = $(shell rustc --version))
+  $(info rustup --version              = $(shell $(RUSTUP) --version 2>/dev/null))
   $(info *******************************************************)
   $(info )
 endif
@@ -225,12 +334,12 @@ all: release
 # binary. This makes checking for Rust errors much faster.
 .PHONY: check
 check:
-	$(Q)$(CARGO) check $(VERBOSE) $(CARGO_FLAGS_TOCK)
+	$(Q)$(CARGO) check $(VERBOSE_FLAGS) $(CARGO_FLAGS_TOCK)
 
 
 .PHONY: clean
 clean::
-	$(Q)$(CARGO) clean $(VERBOSE) --target-dir=$(TARGET_DIRECTORY)
+	$(Q)$(CARGO) clean $(VERBOSE_FLAGS) --target-dir=$(TARGET_DIRECTORY)
 
 .PHONY: release
 release:  $(TARGET_PATH)/release/$(PLATFORM).bin
@@ -245,7 +354,7 @@ debug-lst:  $(TARGET_PATH)/debug/$(PLATFORM).lst
 doc: | target
 	@# This mess is all to work around rustdoc giving no way to return an
 	@# error if there are warnings. This effectively simulates that.
-	$(Q)RUSTDOCFLAGS='-Z unstable-options --document-hidden-items -D warnings' $(CARGO) --color=always doc $(VERBOSE) --release --package $(PLATFORM) --target-dir=$(TARGET_DIRECTORY) 2>&1 | tee /dev/tty | grep -q warning && (echo "Warnings detected during doc build" && if [[ $$CI == "true" ]]; then echo "Erroring due to CI context" && exit 33; fi) || if [ $$? -eq 33 ]; then exit 1; fi
+	$(Q)RUSTDOCFLAGS='-Z unstable-options --document-hidden-items -D warnings' $(CARGO) --color=always doc $(VERBOSE_FLAGS) --release --package $(PLATFORM) --target-dir=$(TARGET_DIRECTORY) 2>&1 | grep -C 9999 warning && (echo "Warnings detected during doc build" && if [[ $$NOWARNINGS == "true" ]]; then echo "Erroring due to CI context" && exit 33; fi) || if [ $$? -eq 33 ]; then exit 1; fi
 
 
 .PHONY: lst
@@ -256,6 +365,40 @@ lst: $(TARGET_PATH)/release/$(PLATFORM).lst
 .PHONY: show-target
 show-target:
 	$(info $(TARGET))
+
+# This rule is a copy of the rule used to build the release target, but `cargo
+# rustc` has been replaced with `cargo bloat`. `cargo bloat` replicates the
+# interface of `cargo build`, rather than `cargo rustc`, so we need to move
+# `RUSTC_FLAGS_FOR_BIN` into the `RUSTFLAGS` environment variable. This only
+# means that cargo cannot reuse built dependencies built using `cargo bloat`.
+# See the discussion on `RUSTC_FLAGS_FOR_BIN` above for additional details. To
+# pass additional flags to `cargo bloat`, populate the CARGO_BLOAT_FLAGS
+# environment variable, e.g. run `CARGO_BLOAT_FLAGS=--crates make cargobloat`
+.PHONY: cargobloat
+cargobloat:
+	$(Q)$(CARGO) install cargo-bloat > /dev/null 2>&1 ||  echo 'Error: Failed to install cargo-bloat'
+	$(Q)RUSTFLAGS="$(RUSTC_FLAGS_TOCK) $(RUSTC_FLAGS_FOR_BIN)" CARGO_FLAGS="-Z build-std=core" $(CARGO) bloat $(CARGO_FLAGS_TOCK_NO_BUILD_STD) --bin $(PLATFORM) --release $(CARGO_BLOAT_FLAGS)
+
+# To pass additional flags to `cargo cargobloatnoinline`, populate the
+# CARGO_BLOAT_FLAGS environment variable, e.g. run `CARGO_BLOAT_FLAGS=--crates
+# make cargobloatnoinline`
+.PHONY: cargobloatnoinline
+cargobloatnoinline:
+	$(Q)$(CARGO) install cargo-bloat > \dev\null 2>&1 ||  echo 'Error: Failed to install cargo-bloat'
+	$(Q)RUSTFLAGS="$(RUSTC_FLAGS_TOCK) -C inline-threshold=0 $(RUSTC_FLAGS_FOR_BIN)" $(CARGO) bloat $(CARGO_FLAGS_TOCK) --bin $(PLATFORM) --release $(CARGO_BLOAT_FLAGS)
+
+.PHONY: stack-analysis
+#stack_analysis: RUSTC_FLAGS_TOCK += -Z emit-stack-sizes
+stack-analysis:
+	@$ echo $(PLATFORM)
+	@$ echo ----------------------
+	$(Q)$(MAKE) release RUSTC_FLAGS="$(RUSTC_FLAGS) -Z emit-stack-sizes" $(DEVNULL) 2>&1
+	$(Q)$(TOCK_ROOT_DIRECTORY)/tools/stack_analysis.sh $(TARGET_PATH)/release/$(PLATFORM).elf
+
+# Run the `print_tock_memory_usage.py` script for this board.
+.PHONY: memory
+memory: $(TARGET_PATH)/release/$(PLATFORM).elf
+	$(TOCK_ROOT_DIRECTORY)tools/print_tock_memory_usage.py --objdump $(OBJDUMP) -w $(PTMU_ARGS) $<
 
 # Support rules
 
@@ -269,13 +412,14 @@ target:
 
 %.bin: %.elf
 	$(Q)$(OBJCOPY) --output-target=binary $(OBJCOPY_FLAGS) $< $@
+	$(Q)$(SHA256SUM) $@
 
 %.lst: %.elf
 	$(Q)$(OBJDUMP) $(OBJDUMP_FLAGS) $< > $@
 
 
 $(TOCK_ROOT_DIRECTORY)tools/sha256sum/target/debug/sha256sum:
-	$(Q)$(CARGO) build $(VERBOSE) --manifest-path $(TOCK_ROOT_DIRECTORY)tools/sha256sum/Cargo.toml
+	$(Q)$(CARGO) build $(VERBOSE_FLAGS) --manifest-path $(TOCK_ROOT_DIRECTORY)tools/sha256sum/Cargo.toml
 
 
 # Cargo-drivers

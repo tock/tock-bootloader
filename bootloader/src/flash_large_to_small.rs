@@ -6,9 +6,9 @@
 use core::cell::Cell;
 use core::ops::{Index, IndexMut};
 
-use kernel::common::cells::{OptionalCell, TakeCell};
 use kernel::hil;
-use kernel::ReturnCode;
+use kernel::utilities::cells::{OptionalCell, TakeCell};
+use kernel::ErrorCode;
 
 pub struct FiveTwelvePage(pub [u8; 512 as usize]);
 impl Default for FiveTwelvePage {
@@ -96,7 +96,7 @@ impl<'a, Flarge: hil::flash::Flash> hil::flash::Flash for FlashLargeToSmall<'a, 
         &self,
         page_number: usize,
         buf: &'static mut Self::Page,
-    ) -> Result<(), (ReturnCode, &'static mut Self::Page)> {
+    ) -> Result<(), (ErrorCode, &'static mut Self::Page)> {
         // Translate to the large page we need to read.
         let (index, _) = self.get_large_page_index_offset(page_number);
 
@@ -105,12 +105,12 @@ impl<'a, Flarge: hil::flash::Flash> hil::flash::Flash for FlashLargeToSmall<'a, 
 
         // Call the underlying flash layer.
         self.pagebuffer.take().map_or_else(
-            || Err((ReturnCode::FAIL, self.client_pagebuffer.take().unwrap())),
+            || Err((ErrorCode::FAIL, self.client_pagebuffer.take().unwrap())),
             |page| {
                 self.state.set(State::Read { page_number });
                 self.flash_large.read_page(index, page).map_err(|e| {
                     self.pagebuffer.replace(e.1);
-                    (ReturnCode::FAIL, self.client_pagebuffer.take().unwrap())
+                    (ErrorCode::FAIL, self.client_pagebuffer.take().unwrap())
                 })
             },
         )
@@ -120,7 +120,7 @@ impl<'a, Flarge: hil::flash::Flash> hil::flash::Flash for FlashLargeToSmall<'a, 
         &self,
         page_number: usize,
         buf: &'static mut Self::Page,
-    ) -> Result<(), (ReturnCode, &'static mut Self::Page)> {
+    ) -> Result<(), (ErrorCode, &'static mut Self::Page)> {
         // Translate to the large page we need to read.
         let (index, _) = self.get_large_page_index_offset(page_number);
 
@@ -129,31 +129,31 @@ impl<'a, Flarge: hil::flash::Flash> hil::flash::Flash for FlashLargeToSmall<'a, 
 
         // Call the underlying flash layer to read the original large page.
         self.pagebuffer.take().map_or_else(
-            || Err((ReturnCode::FAIL, self.client_pagebuffer.take().unwrap())),
+            || Err((ErrorCode::FAIL, self.client_pagebuffer.take().unwrap())),
             |page| {
                 self.state.set(State::Write { page_number });
                 self.flash_large.read_page(index, page).map_err(|e| {
                     self.pagebuffer.replace(e.1);
-                    (ReturnCode::FAIL, self.client_pagebuffer.take().unwrap())
+                    (ErrorCode::FAIL, self.client_pagebuffer.take().unwrap())
                 })
             },
         )
     }
 
-    fn erase_page(&self, page_number: usize) -> ReturnCode {
+    fn erase_page(&self, page_number: usize) -> Result<(), ErrorCode> {
         // Translate to the large page we need to read.
         let (index, _) = self.get_large_page_index_offset(page_number);
 
         // Call the underlying flash layer to read the original large page.
-        self.pagebuffer.take().map_or(ReturnCode::FAIL, |page| {
+        self.pagebuffer.take().map_or(Err(ErrorCode::FAIL), |page| {
             self.state.set(State::Erase { page_number });
-            self.flash_large.read_page(index, page).map_or_else(
-                |e| {
-                    self.pagebuffer.replace(e.1);
-                    ReturnCode::FAIL
-                },
-                |_| ReturnCode::SUCCESS,
-            )
+            match self.flash_large.read_page(index, page) {
+                Err((e, buf)) => {
+                    self.pagebuffer.replace(buf);
+                    Err(e)
+                }
+                Ok(()) => Ok(()),
+            }
         })
     }
 }

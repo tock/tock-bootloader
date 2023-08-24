@@ -35,7 +35,8 @@
 //! ```
 
 use kernel::hil;
-use kernel::ReturnCode;
+use kernel::hil::time::ConvertTicks;
+use kernel::ErrorCode;
 
 pub struct UartReceiveTimeout<'a, A: hil::time::Alarm<'a> + 'a> {
     uart: &'a dyn hil::uart::UartData<'a>,
@@ -71,15 +72,15 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::Transmit<'a> for UartReceiveTimeout
         &self,
         tx_buffer: &'static mut [u8],
         tx_len: usize,
-    ) -> (ReturnCode, Option<&'static mut [u8]>) {
+    ) -> Result<(), (ErrorCode, &'static mut [u8])> {
         self.uart.transmit_buffer(tx_buffer, tx_len)
     }
 
-    fn transmit_word(&self, word: u32) -> ReturnCode {
+    fn transmit_word(&self, word: u32) -> Result<(), ErrorCode> {
         self.uart.transmit_word(word)
     }
 
-    fn transmit_abort(&self) -> ReturnCode {
+    fn transmit_abort(&self) -> Result<(), ErrorCode> {
         self.uart.transmit_abort()
     }
 }
@@ -91,15 +92,15 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::Receive<'a> for UartReceiveTimeout<
         &self,
         rx_buffer: &'static mut [u8],
         rx_len: usize,
-    ) -> (ReturnCode, Option<&'static mut [u8]>) {
+    ) -> Result<(), (ErrorCode, &'static mut [u8])> {
         self.uart.receive_buffer(rx_buffer, rx_len)
     }
 
-    fn receive_word(&self) -> ReturnCode {
+    fn receive_word(&self) -> Result<(), ErrorCode> {
         self.uart.receive_word()
     }
 
-    fn receive_abort(&self) -> ReturnCode {
+    fn receive_abort(&self) -> Result<(), ErrorCode> {
         self.uart.receive_abort()
     }
 }
@@ -110,7 +111,7 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveAdvanced<'a> for UartReceive
         rx_buffer: &'static mut [u8],
         rx_len: usize,
         _interbyte_timeout: u8,
-    ) -> (ReturnCode, Option<&'static mut [u8]>) {
+    ) -> Result<(), (ErrorCode, &'static mut [u8])> {
         // Just call receive with the entire buffer.
         self.uart.receive_buffer(rx_buffer, rx_len)
     }
@@ -121,7 +122,7 @@ impl<'a, A: hil::time::Alarm<'a>> hil::gpio::Client for UartReceiveTimeout<'a, A
     // We start a new timer on every toggle to wait for the end of incoming
     // RX bytes.
     fn fired(&self) {
-        let interval = A::ticks_from_ms(30);
+        let interval = self.alarm.ticks_from_ms(30);
         self.alarm.set_alarm(self.alarm.now(), interval);
     }
 }
@@ -136,7 +137,13 @@ impl<'a, A: hil::time::Alarm<'a>> hil::time::AlarmClient for UartReceiveTimeout<
 // Callbacks from the underlying UART driver.
 impl<'a, A: hil::time::Alarm<'a>> hil::uart::TransmitClient for UartReceiveTimeout<'a, A> {
     // Called when the UART TX has finished.
-    fn transmitted_buffer(&self, _buffer: &'static mut [u8], _tx_len: usize, _rval: ReturnCode) {}
+    fn transmitted_buffer(
+        &self,
+        _buffer: &'static mut [u8],
+        _tx_len: usize,
+        _rval: Result<(), ErrorCode>,
+    ) {
+    }
 }
 
 // Callbacks from the underlying UART driver.
@@ -146,7 +153,7 @@ impl<'a, A: hil::time::Alarm<'a>> hil::uart::ReceiveClient for UartReceiveTimeou
         &self,
         _buffer: &'static mut [u8],
         _rx_len: usize,
-        _rval: ReturnCode,
+        _rval: Result<(), ErrorCode>,
         _error: hil::uart::Error,
     ) {
     }

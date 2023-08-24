@@ -1,0 +1,43 @@
+[package]
+name = "wm1110_dev-bootloader"
+version = "0.1.0"
+authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
+build = "build.rs"
+edition = "2021"
+
+[dependencies]
+cortexm4 = { git = "https://github.com/tock/tock", rev = "c56c68824" }
+capsules-core = { git = "https://github.com/tock/tock", rev = "c56c68824" }
+capsules-extra = { git = "https://github.com/tock/tock", rev = "c56c68824" }
+kernel = { git = "https://github.com/tock/tock", rev = "c56c68824" }
+nrf52 = { git = "https://github.com/tock/tock", rev = "c56c68824" }
+nrf52840 = { git = "https://github.com/tock/tock", rev = "c56c68824" }
+components = { git = "https://github.com/tock/tock", rev = "c56c68824" }
+
+# For Development
+# cortexm4 = { path = "../../../tock/arch/cortex-m4" }
+# capsules = { path = "../../../tock/capsules" }
+# kernel = { path = "../../../tock/kernel" }
+# nrf52 = { path = "../../../tock/chips/nrf52" }
+# nrf52833 = { path = "../../../tock/chips/nrf52833" }
+# components = { path = "../../../tock/boards/components" }
+
+bootloader = { path = "../../bootloader" }
+bootloader_nrf52 = { path = "../../chips/bootloader_nrf52" }
+bootloader_cortexm = { path = "../../arch/bootloader_cortexm" }
+
+
+[build-dependencies]
+bootloader_attributes = { path = "../../tools/bootloader_attributes" }
+
+[profile.dev]
+panic = "abort"
+lto = false
+opt-level = "z"
+debug = true
+
+[profile.release]
+panic = "abort"
+lto = true
+opt-level = "z"
+debug = true
