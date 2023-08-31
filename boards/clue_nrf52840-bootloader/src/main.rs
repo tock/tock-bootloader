@@ -208,7 +208,7 @@ pub unsafe fn main() {
     //--------------------------------------------------------------------------
 
     let rtc = &base_peripherals.rtc;
-    rtc.start();
+    let _ = rtc.start();
 
     let mux_alarm = components::alarm::AlarmMuxComponent::new(rtc)
         .finalize(components::alarm_mux_component_static!(nrf52::rtc::Rtc));
@@ -255,14 +255,14 @@ pub unsafe fn main() {
 
     let cdc = components::cdc::CdcAcmComponent::new(
         &nrf52840_peripherals.usbd,
-        capsules_core::usb::cdc::MAX_CTRL_PACKET_SIZE_NRF52840,
+        capsules_extra::usb::cdc::MAX_CTRL_PACKET_SIZE_NRF52840,
         0x2341,
         0x005a,
         strings,
         mux_alarm,
         None,
     )
-    .finalize(components::usb_cdc_acm_component_static!(
+    .finalize(components::cdc_acm_component_static!(
         nrf52::usbd::Usbd,
         nrf52::rtc::Rtc
     ));

@@ -68,6 +68,7 @@ dependencies = [
  "bootloader_cortexm",
  "bootloader_nrf52",
  "capsules-core",
+ "capsules-extra",
  "components",
  "cortexm4",
  "kernel",
