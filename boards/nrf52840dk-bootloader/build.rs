@@ -9,7 +9,7 @@ fn main() {
     let version = if let Ok(v) = env::var("BOOTLOADER_VERSION") {
         v
     } else {
-        String::from("1.1.2")
+        String::from("1.1.3")
     };
     bootloader_attributes::write_flags(&mut f, &version, 0x8000);
     bootloader_attributes::write_attribute(&mut f, "board", "nrf52840dk");
