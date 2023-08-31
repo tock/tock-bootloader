@@ -32,6 +32,7 @@ const BUTTON_RST_PIN: Pin = Pin::P0_18;
 
 const LED_4: Pin = Pin::P0_16;
 
+#[allow(dead_code)]
 const BUTTON_4: Pin = Pin::P0_25;
 
 include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
@@ -161,10 +162,8 @@ pub unsafe fn main() {
     // bunch of init code just to reset into the kernel.
 
     let bootloader_entry_mode = static_init!(
-        bootloader::bootloader_entry_gpio::BootloaderEntryGpio<nrf52840::gpio::GPIOPin>,
-        bootloader::bootloader_entry_gpio::BootloaderEntryGpio::new(
-            &nrf52840_peripherals.gpio_port[BUTTON_4]
-        )
+        bootloader_nrf52::bootloader_entry_doublereset::BootloaderEntryDoubleReset,
+        bootloader_nrf52::bootloader_entry_doublereset::BootloaderEntryDoubleReset::new()
     );
 
     let bootloader_jumper = static_init!(

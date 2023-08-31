@@ -29,7 +29,7 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 [[package]]
 name = "cortexm"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?rev=c56c68824#c56c68824fd7b993023338fb0dca1fbef9fdd42a"
+source = "git+https://github.com/tock/tock?rev=2ff6868#2ff68681780355decc314ac17ceba2377d16d0da"
 dependencies = [
  "kernel",
 ]
@@ -37,7 +37,7 @@ dependencies = [
 [[package]]
 name = "cortexm4"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?rev=c56c68824#c56c68824fd7b993023338fb0dca1fbef9fdd42a"
+source = "git+https://github.com/tock/tock?rev=2ff6868#2ff68681780355decc314ac17ceba2377d16d0da"
 dependencies = [
  "cortexm",
  "kernel",
@@ -46,12 +46,12 @@ dependencies = [
 [[package]]
 name = "enum_primitive"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?rev=c56c68824#c56c68824fd7b993023338fb0dca1fbef9fdd42a"
+source = "git+https://github.com/tock/tock?rev=2ff6868#2ff68681780355decc314ac17ceba2377d16d0da"
 
 [[package]]
 name = "kernel"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?rev=c56c68824#c56c68824fd7b993023338fb0dca1fbef9fdd42a"
+source = "git+https://github.com/tock/tock?rev=2ff6868#2ff68681780355decc314ac17ceba2377d16d0da"
 dependencies = [
  "tock-cells",
  "tock-registers",
@@ -61,7 +61,7 @@ dependencies = [
 [[package]]
 name = "nrf52"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?rev=c56c68824#c56c68824fd7b993023338fb0dca1fbef9fdd42a"
+source = "git+https://github.com/tock/tock?rev=2ff6868#2ff68681780355decc314ac17ceba2377d16d0da"
 dependencies = [
  "cortexm4",
  "enum_primitive",
@@ -72,7 +72,7 @@ dependencies = [
 [[package]]
 name = "nrf5x"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?rev=c56c68824#c56c68824fd7b993023338fb0dca1fbef9fdd42a"
+source = "git+https://github.com/tock/tock?rev=2ff6868#2ff68681780355decc314ac17ceba2377d16d0da"
 dependencies = [
  "enum_primitive",
  "kernel",
@@ -88,14 +88,14 @@ dependencies = [
 [[package]]
 name = "tock-cells"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?rev=c56c68824#c56c68824fd7b993023338fb0dca1fbef9fdd42a"
+source = "git+https://github.com/tock/tock?rev=2ff6868#2ff68681780355decc314ac17ceba2377d16d0da"
 
 [[package]]
 name = "tock-registers"
 version = "0.8.1"
-source = "git+https://github.com/tock/tock?rev=c56c68824#c56c68824fd7b993023338fb0dca1fbef9fdd42a"
+source = "git+https://github.com/tock/tock?rev=2ff6868#2ff68681780355decc314ac17ceba2377d16d0da"
 
 [[package]]
 name = "tock-tbf"
 version = "0.1.0"
-source = "git+https://github.com/tock/tock?rev=c56c68824#c56c68824fd7b993023338fb0dca1fbef9fdd42a"
+source = "git+https://github.com/tock/tock?rev=2ff6868#2ff68681780355decc314ac17ceba2377d16d0da"
