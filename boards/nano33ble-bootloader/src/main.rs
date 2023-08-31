@@ -230,6 +230,7 @@ pub unsafe fn reset_handler() {
         VirtualMuxAlarm<'static, nrf52::rtc::Rtc>,
         VirtualMuxAlarm::new(mux_alarm)
     );
+    recv_auto_virtual_alarm.setup();
 
     let recv_auto_cdc = static_init!(
         bootloader::uart_receive_multiple_timeout::UartReceiveMultipleTimeout<
