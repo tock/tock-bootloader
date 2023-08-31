@@ -10,18 +10,20 @@
 use core::panic::PanicInfo;
 
 use kernel::capabilities;
-use kernel::common::dynamic_deferred_call::{DynamicDeferredCall, DynamicDeferredCallClientState};
 use kernel::component::Component;
 use kernel::hil;
 use kernel::hil::time::Alarm;
 use kernel::hil::time::Counter;
 use kernel::hil::usb::Client;
-use kernel::mpu::MPU;
-use kernel::Chip;
-#[allow(unused_imports)]
-use kernel::{create_capability, debug, debug_gpio, debug_verbose, static_init};
+use kernel::platform::chip::Chip;
+use kernel::platform::mpu::MPU;
+use kernel::platform::KernelResources;
+use kernel::platform::SyscallDriverLookup;
+use kernel::{create_capability, static_init};
 
-use capsules::virtual_alarm::VirtualMuxAlarm;
+use bootloader::null_scheduler::NullScheduler;
+
+use capsules_core::virtualizers::virtual_alarm::VirtualMuxAlarm;
 
 use nrf52840::interrupt_service::Nrf52840DefaultPeripherals;
 
@@ -40,7 +42,7 @@ include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
 // Number of concurrent processes this platform supports.
 const NUM_PROCS: usize = 0;
 
-static mut PROCESSES: [Option<&'static dyn kernel::procs::ProcessType>; NUM_PROCS] =
+static mut PROCESSES: [Option<&'static dyn kernel::process::Process>; NUM_PROCS] =
     [None; NUM_PROCS];
 
 static mut CHIP: Option<&'static nrf52840::chip::NRF52<Nrf52840DefaultPeripherals>> = None;
@@ -67,28 +69,78 @@ pub struct Platform {
         >,
         bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52::nvmc::Nvmc>,
     >,
+    scheduler: &'static NullScheduler,
 }
 
-impl kernel::Platform for Platform {
+impl KernelResources<nrf52840::chip::NRF52<'static, Nrf52840DefaultPeripherals<'static>>>
+    for Platform
+{
+    type SyscallDriverLookup = Self;
+    type SyscallFilter = ();
+    type ProcessFault = ();
+    type CredentialsCheckingPolicy = ();
+    type Scheduler = NullScheduler;
+    type SchedulerTimer = ();
+    type WatchDog = ();
+    type ContextSwitchCallback = ();
+
+    fn syscall_driver_lookup(&self) -> &Self::SyscallDriverLookup {
+        &self
+    }
+    fn syscall_filter(&self) -> &Self::SyscallFilter {
+        &()
+    }
+    fn process_fault(&self) -> &Self::ProcessFault {
+        &()
+    }
+    fn credentials_checking_policy(&self) -> &'static Self::CredentialsCheckingPolicy {
+        &()
+    }
+    fn scheduler(&self) -> &Self::Scheduler {
+        self.scheduler
+    }
+    fn scheduler_timer(&self) -> &Self::SchedulerTimer {
+        &()
+    }
+    fn watchdog(&self) -> &Self::WatchDog {
+        &()
+    }
+    fn context_switch_callback(&self) -> &Self::ContextSwitchCallback {
+        &()
+    }
+}
+
+impl SyscallDriverLookup for Platform {
     fn with_driver<F, R>(&self, _driver_num: usize, f: F) -> R
     where
-        F: FnOnce(Option<&dyn kernel::Driver>) -> R,
+        F: FnOnce(Option<&dyn kernel::syscall::SyscallDriver>) -> R,
     {
         f(None)
     }
 }
 
-/// Entry point in the vector table called on hard reset.
-#[no_mangle]
-pub unsafe fn reset_handler() {
-    // Loads relocations and clears BSS
-    nrf52840::init();
-    let ppi = static_init!(nrf52840::ppi::Ppi, nrf52840::ppi::Ppi::new());
+#[inline(never)]
+unsafe fn create_peripherals() -> &'static mut Nrf52840DefaultPeripherals<'static> {
+    let ieee802154_ack_buf = static_init!(
+        [u8; nrf52840::ieee802154_radio::ACK_BUF_SIZE],
+        [0; nrf52840::ieee802154_radio::ACK_BUF_SIZE]
+    );
     // Initialize chip peripheral drivers
     let nrf52840_peripherals = static_init!(
         Nrf52840DefaultPeripherals,
-        Nrf52840DefaultPeripherals::new(ppi)
+        Nrf52840DefaultPeripherals::new(ieee802154_ack_buf)
     );
+
+    nrf52840_peripherals
+}
+
+/// Entry point in the vector table called on hard reset.
+#[no_mangle]
+pub unsafe fn main() {
+    // Loads relocations and clears BSS
+    nrf52840::init();
+    // Initialize chip peripheral drivers
+    let nrf52840_peripherals = create_peripherals();
 
     // set up circular peripheral dependencies
     nrf52840_peripherals.init();
@@ -146,26 +198,14 @@ pub unsafe fn reset_handler() {
     let main_loop_capability = create_capability!(capabilities::MainLoopCapability);
 
     //--------------------------------------------------------------------------
-    // Deferred Call (Dynamic) Setup
-    //--------------------------------------------------------------------------
-
-    let dynamic_deferred_call_clients =
-        static_init!([DynamicDeferredCallClientState; 2], Default::default());
-    let dynamic_deferred_caller = static_init!(
-        DynamicDeferredCall,
-        DynamicDeferredCall::new(dynamic_deferred_call_clients)
-    );
-    DynamicDeferredCall::set_global_instance(dynamic_deferred_caller);
-
-    //--------------------------------------------------------------------------
     // ALARM & TIMER
     //--------------------------------------------------------------------------
 
     let rtc = &base_peripherals.rtc;
-    rtc.start();
+    let _ = rtc.start();
 
     let mux_alarm = components::alarm::AlarmMuxComponent::new(rtc)
-        .finalize(components::alarm_mux_component_helper!(nrf52::rtc::Rtc));
+        .finalize(components::alarm_mux_component_static!(nrf52::rtc::Rtc));
 
     // //--------------------------------------------------------------------------
     // // UART DEBUGGING
@@ -209,15 +249,14 @@ pub unsafe fn reset_handler() {
 
     let cdc = components::cdc::CdcAcmComponent::new(
         &nrf52840_peripherals.usbd,
-        capsules::usb::cdc::MAX_CTRL_PACKET_SIZE_NRF52840,
+        capsules_extra::usb::cdc::MAX_CTRL_PACKET_SIZE_NRF52840,
         0x2341,
         0x005a,
         strings,
         mux_alarm,
-        dynamic_deferred_caller,
         None,
     )
-    .finalize(components::usb_cdc_acm_component_helper!(
+    .finalize(components::cdc_acm_component_static!(
         nrf52::usbd::Usbd,
         nrf52::rtc::Rtc
     ));
@@ -282,6 +321,12 @@ pub unsafe fn reset_handler() {
     hil::uart::Receive::set_receive_client(cdc, recv_auto_cdc);
     hil::uart::Receive::set_receive_client(recv_auto_cdc, bootloader);
     hil::flash::HasClient::set_client(flash_adapter, bootloader);
+
+    //--------------------------------------------------------------------------
+    // SCHEDULER
+    //--------------------------------------------------------------------------
+
+    let null_scheduler = static_init!(NullScheduler, NullScheduler::new());
 
     //--------------------------------------------------------------------------
     // ALTERNATIVE BOOTLOADER STACK
@@ -364,7 +409,10 @@ pub unsafe fn reset_handler() {
     // approach than this.
     nrf52_components::NrfClockComponent::new(&base_peripherals.clock).finalize(());
 
-    let platform = Platform { bootloader };
+    let platform = Platform {
+        bootloader,
+        scheduler: null_scheduler,
+    };
 
     let chip = static_init!(
         nrf52840::chip::NRF52<Nrf52840DefaultPeripherals>,
@@ -386,13 +434,10 @@ pub unsafe fn reset_handler() {
     // MAIN LOOP
     //--------------------------------------------------------------------------
 
-    let scheduler = components::sched::round_robin::RoundRobinComponent::new(&PROCESSES)
-        .finalize(components::rr_component_helper!(NUM_PROCS));
-    board_kernel.kernel_loop::<_, _, _, NUM_PROCS>(
+    board_kernel.kernel_loop(
         &platform,
         chip,
-        None,
-        scheduler,
+        None::<&kernel::ipc::IPC<0>>,
         &main_loop_capability,
     );
 }
