@@ -241,6 +241,7 @@ pub unsafe fn main() {
         VirtualMuxAlarm<'static, nrf52840::rtc::Rtc>,
         VirtualMuxAlarm::new(mux_alarm)
     );
+    recv_auto_virtual_alarm.setup();
 
     let recv_auto_uart = static_init!(
         bootloader::uart_receive_multiple_timeout::UartReceiveMultipleTimeout<
