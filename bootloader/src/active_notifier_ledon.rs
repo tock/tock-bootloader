@@ -9,6 +9,7 @@ pub struct ActiveNotifierLedon<'a> {
 impl<'a> ActiveNotifierLedon<'a> {
     pub fn new(led: &'a mut dyn kernel::hil::led::Led) -> ActiveNotifierLedon<'a> {
         led.init();
+        led.off();
         ActiveNotifierLedon { led }
     }
 }
