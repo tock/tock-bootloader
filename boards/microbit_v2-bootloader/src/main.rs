@@ -10,15 +10,17 @@
 use core::panic::PanicInfo;
 
 use kernel::capabilities;
-use kernel::common::dynamic_deferred_call::{DynamicDeferredCall, DynamicDeferredCallClientState};
 use kernel::component::Component;
 use kernel::hil;
 use kernel::hil::time::Alarm;
 use kernel::hil::time::Counter;
-#[allow(unused_imports)]
-use kernel::{create_capability, debug, debug_gpio, debug_verbose, static_init};
+use kernel::platform::KernelResources;
+use kernel::platform::SyscallDriverLookup;
+use kernel::{create_capability, static_init};
 
-use capsules::virtual_alarm::VirtualMuxAlarm;
+use bootloader::null_scheduler::NullScheduler;
+
+use capsules_core::virtualizers::virtual_alarm::VirtualMuxAlarm;
 
 use nrf52833::gpio::Pin;
 use nrf52833::interrupt_service::Nrf52833DefaultPeripherals;
@@ -34,7 +36,7 @@ include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
 // Number of concurrent processes this platform supports.
 const NUM_PROCS: usize = 0;
 
-static mut PROCESSES: [Option<&'static dyn kernel::procs::ProcessType>; NUM_PROCS] =
+static mut PROCESSES: [Option<&'static dyn kernel::process::Process>; NUM_PROCS] =
     [None; NUM_PROCS];
 
 static mut CHIP: Option<&'static nrf52833::chip::NRF52<Nrf52833DefaultPeripherals>> = None;
@@ -61,12 +63,51 @@ pub struct Platform {
         >,
         bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52::nvmc::Nvmc>,
     >,
+    scheduler: &'static NullScheduler,
 }
 
-impl kernel::Platform for Platform {
+impl KernelResources<nrf52833::chip::NRF52<'static, Nrf52833DefaultPeripherals<'static>>>
+    for Platform
+{
+    type SyscallDriverLookup = Self;
+    type SyscallFilter = ();
+    type ProcessFault = ();
+    type CredentialsCheckingPolicy = ();
+    type Scheduler = NullScheduler;
+    type SchedulerTimer = ();
+    type WatchDog = ();
+    type ContextSwitchCallback = ();
+
+    fn syscall_driver_lookup(&self) -> &Self::SyscallDriverLookup {
+        &self
+    }
+    fn syscall_filter(&self) -> &Self::SyscallFilter {
+        &()
+    }
+    fn process_fault(&self) -> &Self::ProcessFault {
+        &()
+    }
+    fn credentials_checking_policy(&self) -> &'static Self::CredentialsCheckingPolicy {
+        &()
+    }
+    fn scheduler(&self) -> &Self::Scheduler {
+        self.scheduler
+    }
+    fn scheduler_timer(&self) -> &Self::SchedulerTimer {
+        &()
+    }
+    fn watchdog(&self) -> &Self::WatchDog {
+        &()
+    }
+    fn context_switch_callback(&self) -> &Self::ContextSwitchCallback {
+        &()
+    }
+}
+
+impl SyscallDriverLookup for Platform {
     fn with_driver<F, R>(&self, _driver_num: usize, f: F) -> R
     where
-        F: FnOnce(Option<&dyn kernel::Driver>) -> R,
+        F: FnOnce(Option<&dyn kernel::syscall::SyscallDriver>) -> R,
     {
         f(None)
     }
@@ -74,14 +115,13 @@ impl kernel::Platform for Platform {
 
 /// Entry point in the vector table called on hard reset.
 #[no_mangle]
-pub unsafe fn reset_handler() {
+pub unsafe fn main() {
     // Loads relocations and clears BSS
     nrf52833::init();
-    let ppi = static_init!(nrf52833::ppi::Ppi, nrf52833::ppi::Ppi::new());
     // Initialize chip peripheral drivers
     let nrf52833_peripherals = static_init!(
         Nrf52833DefaultPeripherals,
-        Nrf52833DefaultPeripherals::new(ppi)
+        Nrf52833DefaultPeripherals::new()
     );
 
     // set up circular peripheral dependencies
@@ -140,26 +180,14 @@ pub unsafe fn reset_handler() {
     let main_loop_capability = create_capability!(capabilities::MainLoopCapability);
 
     //--------------------------------------------------------------------------
-    // Deferred Call (Dynamic) Setup
-    //--------------------------------------------------------------------------
-
-    let dynamic_deferred_call_clients =
-        static_init!([DynamicDeferredCallClientState; 5], Default::default());
-    let dynamic_deferred_caller = static_init!(
-        DynamicDeferredCall,
-        DynamicDeferredCall::new(dynamic_deferred_call_clients)
-    );
-    DynamicDeferredCall::set_global_instance(dynamic_deferred_caller);
-
-    //--------------------------------------------------------------------------
     // ALARM & TIMER
     //--------------------------------------------------------------------------
 
     let rtc = &base_peripherals.rtc;
-    rtc.start();
+    let _ = rtc.start();
 
     let mux_alarm = components::alarm::AlarmMuxComponent::new(rtc)
-        .finalize(components::alarm_mux_component_helper!(nrf52::rtc::Rtc));
+        .finalize(components::alarm_mux_component_static!(nrf52::rtc::Rtc));
 
     // //--------------------------------------------------------------------------
     // // UART DEBUGGING
@@ -189,6 +217,7 @@ pub unsafe fn reset_handler() {
         VirtualMuxAlarm<'static, nrf52833::rtc::Rtc>,
         VirtualMuxAlarm::new(mux_alarm)
     );
+    recv_auto_virtual_alarm.setup();
 
     let recv_auto_uart = static_init!(
         bootloader::uart_receive_multiple_timeout::UartReceiveMultipleTimeout<
@@ -204,7 +233,7 @@ pub unsafe fn reset_handler() {
     recv_auto_virtual_alarm.set_alarm_client(recv_auto_uart);
 
     // Setup the UART pins
-    &base_peripherals.uarte0.initialize(
+    let _ = base_peripherals.uarte0.initialize(
         nrf52833::pinmux::Pinmux::new(UART_TXD as u32),
         nrf52833::pinmux::Pinmux::new(UART_RXD as u32),
         None,
@@ -251,6 +280,12 @@ pub unsafe fn reset_handler() {
     hil::flash::HasClient::set_client(flash_adapter, bootloader);
 
     //--------------------------------------------------------------------------
+    // SCHEDULER
+    //--------------------------------------------------------------------------
+
+    let null_scheduler = static_init!(NullScheduler, NullScheduler::new());
+
+    //--------------------------------------------------------------------------
     // FINAL SETUP AND BOARD BOOT
     //--------------------------------------------------------------------------
 
@@ -263,7 +298,10 @@ pub unsafe fn reset_handler() {
     while !base_peripherals.clock.low_started() {}
     while !base_peripherals.clock.high_started() {}
 
-    let platform = Platform { bootloader };
+    let platform = Platform {
+        bootloader,
+        scheduler: null_scheduler,
+    };
 
     let chip = static_init!(
         nrf52833::chip::NRF52<Nrf52833DefaultPeripherals>,
@@ -278,13 +316,10 @@ pub unsafe fn reset_handler() {
     // MAIN LOOP
     //--------------------------------------------------------------------------
 
-    let scheduler = components::sched::round_robin::RoundRobinComponent::new(&PROCESSES)
-        .finalize(components::rr_component_helper!(NUM_PROCS));
-    board_kernel.kernel_loop::<_, _, _, NUM_PROCS>(
+    board_kernel.kernel_loop(
         &platform,
         chip,
-        None,
-        scheduler,
+        None::<&kernel::ipc::IPC<0>>,
         &main_loop_capability,
     );
 }
