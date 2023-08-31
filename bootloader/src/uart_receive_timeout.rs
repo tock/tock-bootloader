@@ -130,7 +130,7 @@ impl<'a, A: hil::time::Alarm<'a>> hil::gpio::Client for UartReceiveTimeout<'a, A
 impl<'a, A: hil::time::Alarm<'a>> hil::time::AlarmClient for UartReceiveTimeout<'a, A> {
     /// If the timer actually fires then we stopped receiving bytes.
     fn alarm(&self) {
-        self.uart.receive_abort();
+        let _ = self.uart.receive_abort();
     }
 }
 

@@ -17,7 +17,6 @@ use kernel::hil::time::Alarm;
 use kernel::hil::time::Counter;
 use kernel::platform::KernelResources;
 use kernel::platform::SyscallDriverLookup;
-use kernel::scheduler::round_robin::RoundRobinSched;
 use kernel::static_init;
 
 use bootloader::null_scheduler::NullScheduler;
@@ -118,17 +117,28 @@ impl SyscallDriverLookup for Platform {
     }
 }
 
+#[inline(never)]
+unsafe fn create_peripherals() -> &'static mut Nrf52840DefaultPeripherals<'static> {
+    let ieee802154_ack_buf = static_init!(
+        [u8; nrf52840::ieee802154_radio::ACK_BUF_SIZE],
+        [0; nrf52840::ieee802154_radio::ACK_BUF_SIZE]
+    );
+    // Initialize chip peripheral drivers
+    let nrf52840_peripherals = static_init!(
+        Nrf52840DefaultPeripherals,
+        Nrf52840DefaultPeripherals::new(ieee802154_ack_buf)
+    );
+
+    nrf52840_peripherals
+}
+
 /// Entry point in the vector table called on hard reset.
 #[no_mangle]
 pub unsafe fn main() {
     // Loads relocations and clears BSS
     nrf52840::init();
-    let ppi = static_init!(nrf52840::ppi::Ppi, nrf52840::ppi::Ppi::new());
     // Initialize chip peripheral drivers
-    let nrf52840_peripherals = static_init!(
-        Nrf52840DefaultPeripherals,
-        Nrf52840DefaultPeripherals::new()
-    );
+    let nrf52840_peripherals = create_peripherals();
 
     // set up circular peripheral dependencies
     nrf52840_peripherals.init();
@@ -190,7 +200,7 @@ pub unsafe fn main() {
     //--------------------------------------------------------------------------
 
     let rtc = &base_peripherals.rtc;
-    rtc.start();
+    let _ = rtc.start();
 
     let mux_alarm = components::alarm::AlarmMuxComponent::new(rtc)
         .finalize(components::alarm_mux_component_static!(nrf52::rtc::Rtc));
@@ -244,7 +254,7 @@ pub unsafe fn main() {
     recv_auto_virtual_alarm.set_alarm_client(recv_auto_uart);
 
     // Setup the UART pins
-    &base_peripherals.uarte0.initialize(
+    let _ = base_peripherals.uarte0.initialize(
         nrf52840::pinmux::Pinmux::new(UART_TXD as u32),
         nrf52840::pinmux::Pinmux::new(UART_RXD as u32),
         None,
@@ -305,7 +315,7 @@ pub unsafe fn main() {
 
     let platform = Platform {
         bootloader,
-        null_scheduler,
+        scheduler: null_scheduler,
     };
 
     let chip = static_init!(
@@ -321,7 +331,12 @@ pub unsafe fn main() {
     // MAIN LOOP
     //--------------------------------------------------------------------------
 
-    board_kernel.kernel_loop(&platform, chip, None, &main_loop_capability);
+    board_kernel.kernel_loop(
+        &platform,
+        chip,
+        None::<&kernel::ipc::IPC<0>>,
+        &main_loop_capability,
+    );
 }
 
 #[cfg(not(test))]

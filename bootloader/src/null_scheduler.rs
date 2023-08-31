@@ -12,7 +12,7 @@ use kernel::platform::chip::Chip;
 use kernel::scheduler;
 use kernel::scheduler::SchedulingDecision;
 
-struct NullScheduler {}
+pub struct NullScheduler {}
 
 impl<'a> NullScheduler {
     pub const fn new() -> NullScheduler {
@@ -25,5 +25,5 @@ impl<'a, C: Chip> scheduler::Scheduler<C> for NullScheduler {
         scheduler::SchedulingDecision::TrySleep
     }
 
-    fn result(&self, result: kernel::kernel::StoppedExecutingReason, _: Option<u32>) {}
+    fn result(&self, _result: kernel::process::StoppedExecutingReason, _: Option<u32>) {}
 }
