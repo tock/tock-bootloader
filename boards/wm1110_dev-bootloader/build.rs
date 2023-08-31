@@ -11,10 +11,10 @@ fn main() {
     } else {
         String::from("1.1.3")
     };
-    bootloader_attributes::write_flags(&mut f, &version, 0x8000);
+    bootloader_attributes::write_flags(&mut f, &version, 0x10000);
     bootloader_attributes::write_attribute(&mut f, "board", "wm1110_dev");
     bootloader_attributes::write_attribute(&mut f, "arch", "cortex-m4");
-    bootloader_attributes::write_attribute(&mut f, "appaddr", "0x40000");
+    bootloader_attributes::write_attribute(&mut f, "appaddr", "0x50000");
     if let Ok(bootloader) = env::var("BOOTLOADER_HASH") {
         bootloader_attributes::write_attribute(&mut f, "boothash", &bootloader);
     }
