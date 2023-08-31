@@ -35,6 +35,7 @@ const LED_RED: Pin = Pin::P0_14;
 
 const BUTTON_RST_PIN: Pin = Pin::P0_18;
 
+#[allow(dead_code)]
 const BUTTON_CONFIG: Pin = Pin::P0_25;
 #[allow(dead_code)]
 const BUTTON_USER: Pin = Pin::P0_23;
@@ -176,8 +177,8 @@ pub unsafe fn main() {
     );
 
     let active_notifier_led = static_init!(
-        kernel::hil::led::LedLow<'static, nrf52840::gpio::GPIOPin>,
-        kernel::hil::led::LedLow::new(&nrf52840_peripherals.gpio_port[LED_GREEN])
+        kernel::hil::led::LedHigh<'static, nrf52840::gpio::GPIOPin>,
+        kernel::hil::led::LedHigh::new(&nrf52840_peripherals.gpio_port[LED_GREEN])
     );
 
     let bootloader_active_notifier = static_init!(
