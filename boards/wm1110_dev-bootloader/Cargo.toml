@@ -13,6 +13,7 @@ kernel = { git = "https://github.com/tock/tock", rev = "2ff6868" }
 nrf52 = { git = "https://github.com/tock/tock", rev = "2ff6868" }
 nrf52840 = { git = "https://github.com/tock/tock", rev = "2ff6868" }
 components = { git = "https://github.com/tock/tock", rev = "2ff6868" }
+nrf52_components = { git = "https://github.com/tock/tock", rev = "2ff6868" }
 
 # For Development
 # cortexm4 = { path = "../../../tock/arch/cortex-m4" }

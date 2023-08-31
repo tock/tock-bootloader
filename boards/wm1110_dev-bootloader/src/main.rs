@@ -33,6 +33,8 @@ const LED_GREEN: Pin = Pin::P0_13;
 #[allow(dead_code)]
 const LED_RED: Pin = Pin::P0_14;
 
+const BUTTON_RST_PIN: Pin = Pin::P0_18;
+
 const BUTTON_CONFIG: Pin = Pin::P0_25;
 #[allow(dead_code)]
 const BUTTON_USER: Pin = Pin::P0_23;
@@ -148,6 +150,14 @@ pub unsafe fn main() {
 
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
 
+    nrf52_components::startup::NrfStartupComponent::new(
+        false,
+        BUTTON_RST_PIN,
+        nrf52840::uicr::Regulator0Output::DEFAULT,
+        &base_peripherals.nvmc,
+    )
+    .finalize(());
+
     //--------------------------------------------------------------------------
     // BOOTLOADER ENTRY
     //--------------------------------------------------------------------------
@@ -156,10 +166,8 @@ pub unsafe fn main() {
     // bunch of init code just to reset into the kernel.
 
     let bootloader_entry_mode = static_init!(
-        bootloader::bootloader_entry_gpio::BootloaderEntryGpio<nrf52840::gpio::GPIOPin>,
-        bootloader::bootloader_entry_gpio::BootloaderEntryGpio::new(
-            &nrf52840_peripherals.gpio_port[BUTTON_CONFIG]
-        )
+        bootloader_nrf52::bootloader_entry_doublereset::BootloaderEntryDoubleReset,
+        bootloader_nrf52::bootloader_entry_doublereset::BootloaderEntryDoubleReset::new()
     );
 
     let bootloader_jumper = static_init!(
