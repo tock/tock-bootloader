@@ -30,9 +30,11 @@ const UART_TXD: Pin = Pin::P0_24;
 const UART_RXD: Pin = Pin::P0_22;
 
 const LED_GREEN: Pin = Pin::P0_13;
+#[allow(dead_code)]
 const LED_RED: Pin = Pin::P0_14;
 
 const BUTTON_CONFIG: Pin = Pin::P0_25;
+#[allow(dead_code)]
 const BUTTON_USER: Pin = Pin::P0_23;
 
 include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
