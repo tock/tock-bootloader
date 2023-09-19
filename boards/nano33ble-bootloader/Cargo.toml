@@ -3,16 +3,17 @@ name = "nano33ble-bootloader"
 version = "0.1.0"
 authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
 build = "build.rs"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-cortexm4 = { git = "https://github.com/tock/tock", rev = "405417" }
-capsules = { git = "https://github.com/tock/tock", rev = "405417" }
-kernel = { git = "https://github.com/tock/tock", rev = "405417" }
-nrf52 = { git = "https://github.com/tock/tock", rev = "405417" }
-nrf52840 = { git = "https://github.com/tock/tock", rev = "405417" }
-components = { git = "https://github.com/tock/tock", rev = "405417" }
-nrf52_components = { git = "https://github.com/tock/tock", rev = "405417" }
+cortexm4 = { git = "https://github.com/tock/tock", rev = "2ff6868" }
+capsules-core = { git = "https://github.com/tock/tock", rev = "2ff6868" }
+capsules-extra = { git = "https://github.com/tock/tock", rev = "2ff6868" }
+kernel = { git = "https://github.com/tock/tock", rev = "2ff6868" }
+nrf52 = { git = "https://github.com/tock/tock", rev = "2ff6868" }
+nrf52840 = { git = "https://github.com/tock/tock", rev = "2ff6868" }
+components = { git = "https://github.com/tock/tock", rev = "2ff6868" }
+nrf52_components = { git = "https://github.com/tock/tock", rev = "2ff6868" }
 
 # For Development
 #cortexm4 = { path = "../../../tock/arch/cortex-m4" }

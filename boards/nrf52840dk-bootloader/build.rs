@@ -12,7 +12,7 @@ fn main() {
         String::from("1.1.3")
     };
     bootloader_attributes::write_flags(&mut f, &version, 0x8000);
-    bootloader_attributes::write_attribute(&mut f, "board", "microbit_v2");
+    bootloader_attributes::write_attribute(&mut f, "board", "nrf52840dk");
     bootloader_attributes::write_attribute(&mut f, "arch", "cortex-m4");
     bootloader_attributes::write_attribute(&mut f, "appaddr", "0x40000");
     if let Ok(bootloader) = env::var("BOOTLOADER_HASH") {

@@ -1,6 +1,6 @@
-//! Tock kernel for the bootloader on nrf52 over CDC/USB.
+//! Tock kernel for the bootloader on nrf52 over UART.
 //!
-//! It is based on nRF52833 SoC (Cortex M4 core with a BLE + IEEE 802.15.4 transceiver).
+//! It is based on nRF52840 SoC.
 
 #![no_std]
 // Disable this attribute when documenting, as a workaround for
@@ -11,25 +11,34 @@ use core::panic::PanicInfo;
 
 use kernel::capabilities;
 use kernel::component::Component;
+use kernel::create_capability;
 use kernel::hil;
 use kernel::hil::time::Alarm;
 use kernel::hil::time::Counter;
 use kernel::platform::KernelResources;
 use kernel::platform::SyscallDriverLookup;
-use kernel::{create_capability, static_init};
+use kernel::static_init;
 
 use bootloader::null_scheduler::NullScheduler;
 
 use capsules_core::virtualizers::virtual_alarm::VirtualMuxAlarm;
 
-use nrf52833::gpio::Pin;
-use nrf52833::interrupt_service::Nrf52833DefaultPeripherals;
+use nrf52840::gpio::Pin;
+use nrf52840::interrupt_service::Nrf52840DefaultPeripherals;
 
-const UART_TXD: Pin = Pin::P0_06;
-const UART_RXD: Pin = Pin::P1_08;
+const UART_TXD: Pin = Pin::P0_24;
+const UART_RXD: Pin = Pin::P0_22;
 
-const LED_ON_PIN: Pin = Pin::P0_20;
-const BUTTON_A: Pin = Pin::P0_14;
+const LED_GREEN: Pin = Pin::P0_13;
+#[allow(dead_code)]
+const LED_RED: Pin = Pin::P0_14;
+
+const BUTTON_RST_PIN: Pin = Pin::P0_18;
+
+#[allow(dead_code)]
+const BUTTON_CONFIG: Pin = Pin::P0_25;
+#[allow(dead_code)]
+const BUTTON_USER: Pin = Pin::P0_23;
 
 include!(concat!(env!("OUT_DIR"), "/attributes.rs"));
 
@@ -39,7 +48,7 @@ const NUM_PROCS: usize = 0;
 static mut PROCESSES: [Option<&'static dyn kernel::process::Process>; NUM_PROCS] =
     [None; NUM_PROCS];
 
-static mut CHIP: Option<&'static nrf52833::chip::NRF52<Nrf52833DefaultPeripherals>> = None;
+static mut CHIP: Option<&'static nrf52840::chip::NRF52<Nrf52840DefaultPeripherals>> = None;
 
 /// Dummy buffer that causes the linker to reserve enough space for the stack.
 #[no_mangle]
@@ -66,7 +75,7 @@ pub struct Platform {
     scheduler: &'static NullScheduler,
 }
 
-impl KernelResources<nrf52833::chip::NRF52<'static, Nrf52833DefaultPeripherals<'static>>>
+impl KernelResources<nrf52840::chip::NRF52<'static, Nrf52840DefaultPeripherals<'static>>>
     for Platform
 {
     type SyscallDriverLookup = Self;
@@ -113,22 +122,42 @@ impl SyscallDriverLookup for Platform {
     }
 }
 
+#[inline(never)]
+unsafe fn create_peripherals() -> &'static mut Nrf52840DefaultPeripherals<'static> {
+    let ieee802154_ack_buf = static_init!(
+        [u8; nrf52840::ieee802154_radio::ACK_BUF_SIZE],
+        [0; nrf52840::ieee802154_radio::ACK_BUF_SIZE]
+    );
+    // Initialize chip peripheral drivers
+    let nrf52840_peripherals = static_init!(
+        Nrf52840DefaultPeripherals,
+        Nrf52840DefaultPeripherals::new(ieee802154_ack_buf)
+    );
+
+    nrf52840_peripherals
+}
+
 /// Entry point in the vector table called on hard reset.
 #[no_mangle]
 pub unsafe fn main() {
     // Loads relocations and clears BSS
-    nrf52833::init();
+    nrf52840::init();
     // Initialize chip peripheral drivers
-    let nrf52833_peripherals = static_init!(
-        Nrf52833DefaultPeripherals,
-        Nrf52833DefaultPeripherals::new()
-    );
+    let nrf52840_peripherals = create_peripherals();
 
     // set up circular peripheral dependencies
-    nrf52833_peripherals.init();
-    let base_peripherals = &nrf52833_peripherals.nrf52;
+    nrf52840_peripherals.init();
+    let base_peripherals = &nrf52840_peripherals.nrf52;
 
     let board_kernel = static_init!(kernel::Kernel, kernel::Kernel::new(&PROCESSES));
+
+    nrf52_components::startup::NrfStartupComponent::new(
+        false,
+        BUTTON_RST_PIN,
+        nrf52840::uicr::Regulator0Output::DEFAULT,
+        &base_peripherals.nvmc,
+    )
+    .finalize(());
 
     //--------------------------------------------------------------------------
     // BOOTLOADER ENTRY
@@ -138,10 +167,8 @@ pub unsafe fn main() {
     // bunch of init code just to reset into the kernel.
 
     let bootloader_entry_mode = static_init!(
-        bootloader::bootloader_entry_gpio::BootloaderEntryGpio<nrf52833::gpio::GPIOPin>,
-        bootloader::bootloader_entry_gpio::BootloaderEntryGpio::new(
-            &nrf52833_peripherals.gpio_port[BUTTON_A]
-        )
+        bootloader_nrf52::bootloader_entry_doublereset::BootloaderEntryDoubleReset,
+        bootloader_nrf52::bootloader_entry_doublereset::BootloaderEntryDoubleReset::new()
     );
 
     let bootloader_jumper = static_init!(
@@ -150,8 +177,8 @@ pub unsafe fn main() {
     );
 
     let active_notifier_led = static_init!(
-        kernel::hil::led::LedHigh<'static, nrf52833::gpio::GPIOPin>,
-        kernel::hil::led::LedHigh::new(&nrf52833_peripherals.gpio_port[LED_ON_PIN])
+        kernel::hil::led::LedHigh<'static, nrf52840::gpio::GPIOPin>,
+        kernel::hil::led::LedHigh::new(&nrf52840_peripherals.gpio_port[LED_GREEN])
     );
 
     let bootloader_active_notifier = static_init!(
@@ -209,12 +236,18 @@ pub unsafe fn main() {
     // components::debug_writer::DebugWriterComponent::new(uart_mux).finalize(());
 
     //--------------------------------------------------------------------------
+    // SCHEDULER
+    //--------------------------------------------------------------------------
+
+    let null_scheduler = static_init!(NullScheduler, NullScheduler::new());
+
+    //--------------------------------------------------------------------------
     // BOOTLOADER
     //--------------------------------------------------------------------------
 
     // Setup receive with timeout.
     let recv_auto_virtual_alarm = static_init!(
-        VirtualMuxAlarm<'static, nrf52833::rtc::Rtc>,
+        VirtualMuxAlarm<'static, nrf52840::rtc::Rtc>,
         VirtualMuxAlarm::new(mux_alarm)
     );
     recv_auto_virtual_alarm.setup();
@@ -222,7 +255,7 @@ pub unsafe fn main() {
     let recv_auto_uart = static_init!(
         bootloader::uart_receive_multiple_timeout::UartReceiveMultipleTimeout<
             'static,
-            VirtualMuxAlarm<'static, nrf52833::rtc::Rtc>,
+            VirtualMuxAlarm<'static, nrf52840::rtc::Rtc>,
         >,
         bootloader::uart_receive_multiple_timeout::UartReceiveMultipleTimeout::new(
             &base_peripherals.uarte0,
@@ -234,8 +267,8 @@ pub unsafe fn main() {
 
     // Setup the UART pins
     let _ = base_peripherals.uarte0.initialize(
-        nrf52833::pinmux::Pinmux::new(UART_TXD as u32),
-        nrf52833::pinmux::Pinmux::new(UART_RXD as u32),
+        nrf52840::pinmux::Pinmux::new(UART_TXD as u32),
+        nrf52840::pinmux::Pinmux::new(UART_RXD as u32),
         None,
         None,
     );
@@ -243,7 +276,7 @@ pub unsafe fn main() {
     let nrfpagebuffer = static_init!(nrf52::nvmc::NrfPage, nrf52::nvmc::NrfPage::default());
 
     let flash_adapter = static_init!(
-        bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52833::nvmc::Nvmc>,
+        bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52840::nvmc::Nvmc>,
         bootloader::flash_large_to_small::FlashLargeToSmall::new(
             &base_peripherals.nvmc,
             nrfpagebuffer,
@@ -261,7 +294,7 @@ pub unsafe fn main() {
             'static,
             bootloader::uart_receive_multiple_timeout::UartReceiveMultipleTimeout<
                 'static,
-                VirtualMuxAlarm<'static, nrf52833::rtc::Rtc>,
+                VirtualMuxAlarm<'static, nrf52840::rtc::Rtc>,
             >,
             bootloader::flash_large_to_small::FlashLargeToSmall<'static, nrf52::nvmc::Nvmc>,
         >,
@@ -278,12 +311,6 @@ pub unsafe fn main() {
     hil::uart::Receive::set_receive_client(&base_peripherals.uarte0, recv_auto_uart);
     hil::uart::Receive::set_receive_client(recv_auto_uart, bootloader);
     hil::flash::HasClient::set_client(flash_adapter, bootloader);
-
-    //--------------------------------------------------------------------------
-    // SCHEDULER
-    //--------------------------------------------------------------------------
-
-    let null_scheduler = static_init!(NullScheduler, NullScheduler::new());
 
     //--------------------------------------------------------------------------
     // FINAL SETUP AND BOARD BOOT
@@ -304,8 +331,8 @@ pub unsafe fn main() {
     };
 
     let chip = static_init!(
-        nrf52833::chip::NRF52<Nrf52833DefaultPeripherals>,
-        nrf52833::chip::NRF52::new(nrf52833_peripherals)
+        nrf52840::chip::NRF52<Nrf52840DefaultPeripherals>,
+        nrf52840::chip::NRF52::new(nrf52840_peripherals)
     );
     CHIP = Some(chip);
 

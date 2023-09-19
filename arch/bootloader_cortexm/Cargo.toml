@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Tock Project Developers <tock-dev@googlegroups.com>"]
 
 [dependencies]
-kernel = { git = "https://github.com/tock/tock", rev = "405417" }
+kernel = { git = "https://github.com/tock/tock", rev = "2ff6868" }
 #kernel = { path = "../../../tock/kernel" }
 
 bootloader = { path = "../../bootloader" }

@@ -3,8 +3,8 @@
 //! On the nRF52 the GPREGRET memory location is preserved on a soft reset. This
 //! allows the kernel to set this before resetting and resume in the bootloader.
 
-use kernel::common::cells::VolatileCell;
-use kernel::common::StaticRef;
+use kernel::utilities::cells::VolatileCell;
+use kernel::utilities::StaticRef;
 
 /// Magic value for the GPREGRET register that tells our bootloader to stay in
 /// bootloader mode. This value is not the same as the Adafruit nRF52 bootloader
