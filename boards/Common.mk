@@ -192,6 +192,15 @@ ifneq ($(shell $(RUSTUP) target list | grep "$(TARGET) (installed)"),$(TARGET) (
   $(warning Consider updating 'targets' in 'rust-toolchain.toml')
   $(shell sleep 5s && $(RUSTUP) target add $(TARGET))
 endif
+# check llvm_tools component
+LLVM_TOOLS_INSTALLED := $(shell  rustup component list --installed | grep llvm-tools 1>/dev/null 2>&1 && echo "true" || echo "no")
+ifeq ($(LLVM_TOOLS_INSTALLED), true)
+    $(info llvm-tools component seems to be installed, continue...)
+    TOOLCHAIN := llvm-tools
+else
+    $(warning Install llvm-tools component: rustup component add llvm-tools , and try again.)
+    TOOLCHAIN := N/A
+endif
 endif # $(NO_RUSTUP)
 
 # If the user is using the standard toolchain provided as part of the llvm-tools
